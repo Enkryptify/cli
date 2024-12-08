@@ -10,9 +10,8 @@ import (
 )
 
 type Config struct {
-	WorkspaceID   string `json:"workspace_id"`
-	ProjectID     string `json:"project_id"`
-	EnvironmentID string `json:"environment_id"`
+	ProjectID     int64  `json:"project_id"`
+	EnvironmentID int64  `json:"environment_id"`
 	PublicKey     string `json:"public_key"`
 	DirectoryPath string `json:"directory_path"`
 }
@@ -72,15 +71,13 @@ func (cm *ConfigManager) save() error {
 	return os.WriteFile(cm.configPath, data, 0600)
 }
 
-func (cm *ConfigManager) SetConfig(config Config, projectKey string) error {
-	// Get absolute path
+func (cm *ConfigManager) SetConfig(config Config, token string, projectKey string) error {
 	absPath, err := filepath.Abs(config.DirectoryPath)
 	if err != nil {
 		return err
 	}
 	config.DirectoryPath = absPath
 
-	// Update or add config
 	found := false
 	for i, cfg := range cm.configs {
 		if cfg.DirectoryPath == config.DirectoryPath {
@@ -94,36 +91,38 @@ func (cm *ConfigManager) SetConfig(config Config, projectKey string) error {
 		cm.configs = append(cm.configs, config)
 	}
 
-	// Save config file
 	if err := cm.save(); err != nil {
+		return err
+	} else if err := keyring.Set(servicePrefix+"-project-key-"+absPath, "ek-cli", projectKey); err != nil {
 		return err
 	}
 
-	// Store project key in system keyring
-	keyringService := servicePrefix + "-" + absPath
-	return keyring.Set(keyringService, "project_key", projectKey)
+	return keyring.Set(servicePrefix+"-token-"+absPath, "ek-cli", token)
 }
 
-func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, error) {
+func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, string, error) {
 	absPath, err := filepath.Abs(dirPath)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 
-	// Find config for directory
 	for _, cfg := range cm.configs {
 		if cfg.DirectoryPath == absPath {
-			// Get project key from system keyring
-			keyringService := servicePrefix + "-" + absPath
-			projectKey, err := keyring.Get(keyringService, "project_key")
+			token, err := keyring.Get(servicePrefix+"-token-"+absPath, "ek-cli")
 			if err != nil {
-				return nil, "", err
+				return nil, "", "", err
 			}
-			return &cfg, projectKey, nil
+
+			projectKey, err := keyring.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
+			if err != nil {
+				return nil, "", "", err
+			}
+
+			return &cfg, token, projectKey, nil
 		}
 	}
 
-	return nil, "", os.ErrNotExist
+	return nil, "", "", os.ErrNotExist
 }
 
 func (cm *ConfigManager) DeleteConfig(dirPath string) error {
@@ -132,7 +131,6 @@ func (cm *ConfigManager) DeleteConfig(dirPath string) error {
 		return err
 	}
 
-	// Remove config
 	for i, cfg := range cm.configs {
 		if cfg.DirectoryPath == absPath {
 			cm.configs = append(cm.configs[:i], cm.configs[i+1:]...)
@@ -140,12 +138,11 @@ func (cm *ConfigManager) DeleteConfig(dirPath string) error {
 		}
 	}
 
-	// Save config file
 	if err := cm.save(); err != nil {
+		return err
+	} else if err := keyring.Delete(servicePrefix+"-project-key-"+absPath, "ek-cli"); err != nil {
 		return err
 	}
 
-	// Remove project key from system keyring
-	keyringService := servicePrefix + "-" + absPath
-	return keyring.Delete(keyringService, "project_key")
+	return keyring.Delete(servicePrefix+"-token-"+absPath, "ek-cli")
 }

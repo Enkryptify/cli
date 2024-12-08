@@ -11,13 +11,14 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.enkryptify.com/v1"
+	// defaultBaseURL = "https://api.enkryptify.com/v1"
+	defaultBaseURL = "http://localhost:8080/v1"
 	defaultTimeout = 10 * time.Second
 )
 
 type Client struct {
 	baseURL    string
-	apiKey     string
+	token      string
 	httpClient *http.Client
 }
 
@@ -41,10 +42,10 @@ func WithQuery(params map[string]string) RequestOption {
 	}
 }
 
-func NewClient(apiKey string, opts ...ClientOption) *Client {
+func NewClient(token string, opts ...ClientOption) *Client {
 	client := &Client{
 		baseURL: defaultBaseURL,
-		apiKey:  apiKey,
+		token:   token,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 		},
@@ -74,7 +75,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", c.apiKey)
+	req.Header.Set("Authorization", c.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 

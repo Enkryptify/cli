@@ -40,18 +40,25 @@ type encryptedData struct {
 	AuthTag string `json:"authTag"`
 }
 
-func NewDecryptor(privateKey [32]byte, publicKeyB64 string) (*Decryptor, error) {
+func NewDecryptor(privateKeyB64 string, publicKeyB64 string) (*Decryptor, error) {
+	privateKey, err := base64.StdEncoding.DecodeString(privateKeyB64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid private key: %w", err)
+	}
+
 	publicKey, err := base64.StdEncoding.DecodeString(publicKeyB64)
 	if err != nil {
 		return nil, fmt.Errorf("invalid public key: %w", err)
 	}
 
-	if len(publicKey) != publicKeySize {
+	if len(privateKey) != privateKeySize {
+		return nil, fmt.Errorf("invalid private key size: expected %d, got %d", privateKeySize, len(privateKey))
+	} else if len(publicKey) != publicKeySize {
 		return nil, fmt.Errorf("invalid public key size: expected %d, got %d", publicKeySize, len(publicKey))
 	}
 
 	return &Decryptor{
-		privateKey: privateKey[:],
+		privateKey: privateKey,
 		publicKey:  publicKey,
 	}, nil
 }

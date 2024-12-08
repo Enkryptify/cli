@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.0-alpha.1"
+const version = "0.1.0"
 
 var rootCmd = &cobra.Command{
 	Use:   "enkryptify",

@@ -4,50 +4,29 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-type Workspace struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+type Token struct {
+	ID            int64     `json:"id"`
+	Name          string    `json:"name"`
+	ProjectID     int64     `json:"projectId"`
+	EnvironmentID int64     `json:"environmentId"`
+	ExpiresAt     time.Time `json:"expiresAt"`
+	Key           string    `json:"key"`
+	PublicKey     string    `json:"publicKey"`
 }
 
-type WorkspaceResponse struct {
-	Data []Workspace `json:"data"`
+type TokenResponse struct {
+	Data Token `json:"data"`
 }
 
-func (c *Client) GetWorkspaces(ctx context.Context, workspaces *WorkspaceResponse) error {
-	return c.doRequest(ctx, http.MethodGet, "/integrations/workspaces", nil, workspaces)
-}
-
-type Project struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-type ProjectResponse struct {
-	Data []Project `json:"data"`
-}
-
-func (c *Client) GetProjects(ctx context.Context, workspaceId string, projects *ProjectResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/projects?workspaceId=%s", workspaceId), nil, projects)
-}
-
-type ProjectKey struct {
-	ID        int    `json:"id"`
-	Key       string `json:"key"`
-	PublicKey string `json:"publicKey"`
-}
-
-type ProjectKeyResponse struct {
-	Data ProjectKey `json:"data"`
-}
-
-func (c *Client) GetProjectKey(ctx context.Context, projectId string, projectKey *ProjectKeyResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/projects/%s/key", projectId), nil, projectKey)
+func (c *Client) GetToken(ctx context.Context, token *TokenResponse) error {
+	return c.doRequest(ctx, http.MethodGet, "/integrations/token", nil, token)
 }
 
 type Environment struct {
-	ID   int    `json:"id"`
+	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 
@@ -55,12 +34,12 @@ type EnvironmentResponse struct {
 	Data []Environment `json:"data"`
 }
 
-func (c *Client) GetEnvironments(ctx context.Context, projectId string, environments *EnvironmentResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/projects/%s/environments", projectId), nil, environments)
+func (c *Client) GetEnvironments(ctx context.Context, projectId int64, environments *EnvironmentResponse) error {
+	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/project/%d/environment", projectId), nil, environments)
 }
 
 type Secret struct {
-	ID    int    `json:"id"`
+	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
@@ -69,6 +48,6 @@ type SecretResponse struct {
 	Data []Secret `json:"data"`
 }
 
-func (c *Client) GetSecrets(ctx context.Context, projectId string, environmentId string, secrets *SecretResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/projects/%s/environments/%s/secrets", projectId, environmentId), nil, secrets)
+func (c *Client) GetSecrets(ctx context.Context, projectId int64, environmentId int64, secrets *SecretResponse) error {
+	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/project/%d/environment/%d/secret", projectId, environmentId), nil, secrets)
 }

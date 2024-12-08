@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"crypto/sha256"
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"github.com/Enkryptify/cli/api"
 	"github.com/Enkryptify/cli/utils/config"
 	"github.com/Enkryptify/cli/utils/encryption"
-	"github.com/Enkryptify/cli/utils/keys"
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +44,8 @@ var exportCmd = &cobra.Command{
 	Short: "Export secrets in different formats",
 	Example: `  enkryptify export --format=file > ./secrets.env
   enkryptify export --format=json > ./secrets.json
-  enkryptify export --format=env
-  enkryptify export --format=env --select=API_KEY,DB_PASSWORD
+  source <(enkryptify export --format=env)
+  source <(enkryptify export --format=env --select=API_KEY,DB_PASSWORD)
   enkryptify export --format=json --exclude=SENSITIVE_KEY`,
 	Run: func(cmd *cobra.Command, args []string) {
 		format, _ := cmd.Flags().GetString("format")
@@ -79,7 +79,6 @@ var exportCmd = &cobra.Command{
 
 		switch exportConfig.Format {
 		case FileFormat, JSONFormat, EnvFormat:
-			// Valid format
 		default:
 			fmt.Printf("Error: invalid format '%s'. Must be one of: file, json, env\n", format)
 			os.Exit(1)
@@ -97,19 +96,14 @@ var exportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		cfg, projectKey, err := cm.GetConfig(cwd)
+		cfg, token, projectKey, err := cm.GetConfig(cwd)
 		if err != nil {
 			fmt.Printf("No configuration found for directory %s: %v\n", cwd, err)
 			os.Exit(1)
 		}
 
-		key, err := keys.GetAPIKey()
-		if err != nil {
-			fmt.Println("No API key found")
-			os.Exit(1)
-		}
-
-		privateKey := sha256.Sum256([]byte(key))
+		parts := strings.Split(token, "_")
+		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
 		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
 		if err != nil {
 			fmt.Printf("Error creating decryption service: %v\n", err)
@@ -122,29 +116,16 @@ var exportCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		projectKeyBytes := sha256.Sum256([]byte(projectKeyDecrypted))
+		projectKeyBytes := []byte(projectKeyDecrypted)
 
-		// client := api.NewClient(key)
-		// ctx := context.Background()
+		client := api.NewClient(token)
+		ctx := context.Background()
 
-		var secrets api.SecretResponse = api.SecretResponse{
-			Data: []api.Secret{
-				{
-					ID:    1,
-					Name:  "SECRET_1",
-					Value: "encrypted_value_1",
-				},
-				{
-					ID:    2,
-					Name:  "SECRET_2",
-					Value: "encrypted_value_2",
-				},
-			},
+		var secrets api.SecretResponse
+		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
+			fmt.Printf("Error getting secrets: %v\n", err)
+			return
 		}
-		// if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
-		// 	fmt.Printf("Error getting secrets: %v\n", err)
-		// 	return
-		// }
 
 		decryptedSecrets := make(map[string]string)
 		for _, secret := range secrets.Data {

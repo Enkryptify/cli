@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"crypto/sha256"
+	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,7 +13,6 @@ import (
 	"github.com/Enkryptify/cli/api"
 	"github.com/Enkryptify/cli/utils/config"
 	"github.com/Enkryptify/cli/utils/encryption"
-	"github.com/Enkryptify/cli/utils/keys"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,6 @@ var runCmd = &cobra.Command{
 	Example: `  enkryptify run -- npm run start
   enkryptify run -- node server.js
   enkryptify run --command="npm run build && npm run start"`,
-	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		command, _ := cmd.Flags().GetString("command")
 
@@ -55,18 +54,14 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		cfg, projectKey, err := cm.GetConfig(cwd)
+		cfg, token, projectKey, err := cm.GetConfig(cwd)
 		if err != nil {
 			fmt.Printf("No configuration found for directory %s: %v\n", cwd, err)
 			return
 		}
 
-		key, err := keys.GetAPIKey()
-		if err != nil {
-			fmt.Println("No API key found")
-		}
-
-		privateKey := sha256.Sum256([]byte(key))
+		parts := strings.Split(token, "_")
+		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
 		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
 		if err != nil {
 			fmt.Printf("Error creating decryption service: %v\n", err)
@@ -79,32 +74,18 @@ var runCmd = &cobra.Command{
 			return
 		}
 
-		projectKeyBytes := sha256.Sum256([]byte(projectKeyDecrypted))
+		projectKeyBytes := []byte(projectKeyDecrypted)
 
-		// client := api.NewClient(key)
-		// ctx := context.Background()
+		client := api.NewClient(token)
+		ctx := context.Background()
 
-		var secrets api.SecretResponse = api.SecretResponse{
-			Data: []api.Secret{
-				{
-					ID:    1,
-					Name:  "SECRET_1",
-					Value: "VALUE_1",
-				},
-				{
-					ID:    2,
-					Name:  "SECRET_2",
-					Value: "VALUE_2",
-				},
-			},
+		var secrets api.SecretResponse
+		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
+			fmt.Printf("Error getting secrets: %v\n", err)
+			return
 		}
-		// if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
-		// 	fmt.Printf("Error getting secrets: %v\n", err)
-		// 	return
-		// }
 
 		env := os.Environ()
-
 		for _, secret := range secrets.Data {
 			decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
 			if err != nil {
