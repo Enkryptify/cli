@@ -1,0 +1,103 @@
+before:
+    hooks:
+        - go mod tidy
+
+builds:
+    - 
+      binary: enkryptify
+      env:
+          - CGO_ENABLED=0
+      goos:
+          - darwin
+          - freebsd
+          - linux
+          - netbsd
+          - openbsd
+          - windows
+      goarch:
+          - 386
+          - amd64
+          - arm
+          - arm64
+      goarm:
+          - 6
+          - 7
+      ignore:
+        - goos: darwin
+        goarch: "386"
+        - goos: windows
+        goarch: "386"
+        - goos: freebsd
+        goarch: "386"
+      ldflags:
+          - -s -w
+          - -X main.version={{.Version}}
+          - -X main.commit={{.Commit}}
+          - -X main.date={{.Date}}
+
+archives:
+    - format: tar.gz
+      name_template: >-
+          {{ .ProjectName }}_
+          {{- title .Os }}_
+          {{- if eq .Arch "amd64" }}x86_64
+          {{- else }}{{ .Arch }}{{ end }}
+      format_overrides:
+          - goos: windows
+            format: zip
+
+checksum:
+    name_template: 'checksums.txt'
+    algorithm: sha256
+
+changelog:
+    sort: asc
+    filters:
+        exclude:
+            - '^docs:'
+            - '^test:'
+            - '^ci:'
+            - Merge pull request
+            - Merge branch
+
+brews:
+    - name: enkryptify
+      tap:
+          owner: enkryptify
+          name: homebrew-enkryptify
+      commit_author:
+          name: 'Enkryptify Bot'
+          email: 'bot@enkryptify.com'
+      directory: Formula
+      homepage: 'https://enkryptify.com'
+      description: 'Official Enkryptify CLI for injecting secrets into your codebase'
+      license: 'GPL-3.0-only'
+      test: |
+          system "#{bin}/enkryptify --version"
+
+nfpms:
+  - id: enkryptify
+    file_name_template: >-
+      {{ .PackageName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- with .Arm }}v{{ . }}{{ end }}
+      {{- with .Mips }}_{{ . }}{{ end }}
+      {{- if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}
+    homepage: "https://enkryptify.com"
+    maintainer: Enkryptify Bot <bot@enkryptify.com>
+    description: "Official Enkryptify CLI for injecting secrets into your codebase"
+    license: GPL-3.0-only
+    bindir: /usr/bin
+    formats:
+      - deb
+      - rpm
+      - apk
+
+blobs:
+  -
+    provider: gs
+    bucket: enkryptify_cli_releases
+    directory: "{{ .Tag }}"
