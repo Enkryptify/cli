@@ -11,9 +11,8 @@ import (
 )
 
 const (
-	// defaultBaseURL = "https://api.enkryptify.com/v1"
-	defaultBaseURL = "http://localhost:8080/v1"
-	defaultTimeout = 10 * time.Second
+	defaultBaseURL = "https://api.enkryptify.com/v1"
+	defaultTimeout = 30 * time.Second
 )
 
 type Client struct {
