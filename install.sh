@@ -1,5 +1,7 @@
 #!/bin/bash
 
+VERSION="0.1.0"
+
 set -e
 
 RED='\033[0;31m'
@@ -31,9 +33,6 @@ case $ARCH in
         exit 1
         ;;
 esac
-
-# Set version (currently hardcoded to 0.1.1)
-VERSION="0.1.1"
 
 echo -e "${YELLOW}Downloading Enkryptify CLI ${VERSION} for Linux ${ARCH}...${NC}"
 
