@@ -63,7 +63,7 @@ changelog:
 
 brews:
     - name: enkryptify
-      tap:
+      repository:
           owner: enkryptify
           name: homebrew-enkryptify
       commit_author:
@@ -96,8 +96,3 @@ nfpms:
           - deb
           - rpm
           - apk
-
-blobs:
-    - provider: gs
-      bucket: enkryptify_cli_releases
-      directory: '{{ .Tag }}'
