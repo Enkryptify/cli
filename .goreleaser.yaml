@@ -109,25 +109,3 @@ scoops:
     homepage: "https://enkryptify.com"
     description: "Official Enkryptify CLI for injecting secrets into your codebase"
     license: GPL-3.0-only
-
-winget:
-  - name: enkryptify
-    publisher: Enkryptify
-    short_description: "Official Enkryptify CLI for injecting secrets into your codebase"
-    license: GPL-3.0-only
-    publisher_url: https://enkryptify.com
-    commit_author:
-      name: "Enkryptify Bot"
-      email: bot@enkryptify.com
-    homepage: "https://enkryptify.com"
-    skip_upload: auto
-    repository:
-      owner: Enkryptify
-      name: winget-pkgs
-      branch: "cli-{{.Version}}"
-      pull_request:
-        enabled: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
