@@ -4,15 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/zalando/go-keyring"
-)
-
-const (
-	envTokenPrefix      = "ENKRYPTIFY_TOKEN_"
-	envProjectKeyPrefix = "ENKRYPTIFY_PROJECT_KEY_"
 )
 
 type Config struct {
@@ -31,15 +25,7 @@ const (
 type ConfigManager struct {
 	configs    []Config
 	configPath string
-}
-
-func sanitizePath(path string) string {
-	invalid := []string{"/", "\\", ":", " ", "-"}
-	result := path
-	for _, char := range invalid {
-		result = strings.ReplaceAll(result, char, "_")
-	}
-	return result
+	credStore  CredentialStore
 }
 
 func NewConfigManager() (*ConfigManager, error) {
@@ -48,9 +34,17 @@ func NewConfigManager() (*ConfigManager, error) {
 		return nil, err
 	}
 
+	storeDir := filepath.Join(home, configDir)
 	configPath := filepath.Join(home, configDir, configFile)
+
+	credStore, err := GetCredentialStore(storeDir)
+	if err != nil {
+		return nil, err
+	}
+
 	cm := &ConfigManager{
 		configPath: configPath,
+		credStore:  credStore,
 	}
 
 	if err := cm.load(); err != nil {
@@ -110,12 +104,14 @@ func (cm *ConfigManager) SetConfig(config Config, token string, projectKey strin
 		return err
 	}
 
-	if err := keyring.Set(servicePrefix+"-project-key-"+absPath, "ek-cli", projectKey); err != nil {
-		os.Setenv(envProjectKeyPrefix+sanitizePath(absPath), projectKey)
+	if err := cm.credStore.Set(servicePrefix+"-project-key-"+absPath, "ek-cli", projectKey); err != nil {
+		return err
 	}
-	if err := keyring.Set(servicePrefix+"-token-"+absPath, "ek-cli", token); err != nil {
-		os.Setenv(envTokenPrefix+sanitizePath(absPath), token)
+
+	if err := cm.credStore.Set(servicePrefix+"-token-"+absPath, "ek-cli", token); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -127,17 +123,9 @@ func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, string, err
 
 	for _, cfg := range cm.configs {
 		if cfg.DirectoryPath == absPath {
-			token, tokenErr := keyring.Get(servicePrefix+"-token-"+absPath, "ek-cli")
-			projectKey, projectKeyErr := keyring.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
-
-			if tokenErr != nil {
-				token = os.Getenv(envTokenPrefix + sanitizePath(absPath))
-			}
-			if projectKeyErr != nil {
-				projectKey = os.Getenv(envProjectKeyPrefix + sanitizePath(absPath))
-			}
-
-			if token == "" || projectKey == "" {
+			token, tokenErr := cm.credStore.Get(servicePrefix+"-token-"+absPath, "ek-cli")
+			projectKey, projectKeyErr := cm.credStore.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
+			if tokenErr != nil || projectKeyErr != nil {
 				return nil, "", "", os.ErrNotExist
 			}
 
