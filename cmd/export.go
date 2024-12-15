@@ -47,15 +47,13 @@ var exportCmd = &cobra.Command{
   source <(enkryptify export --format=env)
   source <(enkryptify export --format=env --select=API_KEY,DB_PASSWORD)
   enkryptify export --format=json --exclude=SENSITIVE_KEY`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		format, _ := cmd.Flags().GetString("format")
 		selectStr, _ := cmd.Flags().GetString("select")
 		excludeStr, _ := cmd.Flags().GetString("exclude")
 
 		if format == "" {
-			fmt.Println("Error: --format flag is required")
-			cmd.Help()
-			os.Exit(1)
+			return fmt.Errorf("--format flag is required")
 		}
 
 		exportConfig := ExportConfig{
@@ -80,40 +78,34 @@ var exportCmd = &cobra.Command{
 		switch exportConfig.Format {
 		case FileFormat, JSONFormat, EnvFormat:
 		default:
-			fmt.Printf("Error: invalid format '%s'. Must be one of: file, json, env\n", format)
-			os.Exit(1)
+			return fmt.Errorf("invalid format '%s'. Must be one of: file, json, env", format)
 		}
 
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error getting current directory: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error getting current directory: %v", err)
 		}
 
 		cm, err := config.NewConfigManager()
 		if err != nil {
-			fmt.Printf("Error creating config manager: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating config manager: %v", err)
 		}
 
 		cfg, token, projectKey, err := cm.GetConfig(cwd)
 		if err != nil {
-			fmt.Printf("No configuration found for directory %s: %v\n", cwd, err)
-			os.Exit(1)
+			return fmt.Errorf("no configuration found for directory %s: %v", cwd, err)
 		}
 
 		parts := strings.Split(token, "_")
 		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
 		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
 		if err != nil {
-			fmt.Printf("Error creating decryption service: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error creating decryption service: %v", err)
 		}
 
 		projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
 		if err != nil {
-			fmt.Printf("Error decrypting project key: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error decrypting project key: %v", err)
 		}
 
 		projectKeyBytes := []byte(projectKeyDecrypted)
@@ -123,8 +115,7 @@ var exportCmd = &cobra.Command{
 
 		var secrets api.SecretResponse
 		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
-			fmt.Printf("Error getting secrets: %v\n", err)
-			return
+			return fmt.Errorf("error getting secrets: %v", err)
 		}
 
 		decryptedSecrets := make(map[string]string)
@@ -135,16 +126,16 @@ var exportCmd = &cobra.Command{
 
 			decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
 			if err != nil {
-				fmt.Printf("Error decrypting secret %s: %v\n", secret.Name, err)
-				continue
+				return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
 			}
 			decryptedSecrets[secret.Name] = decryptedValue
 		}
 
 		if err := exportSecrets(exportConfig, decryptedSecrets); err != nil {
-			fmt.Printf("Error exporting secrets: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error exporting secrets: %v", err)
 		}
+
+		return nil
 	},
 }
 

@@ -29,17 +29,15 @@ var configureCmd = &cobra.Command{
 	Short: "Configure your project",
 	Example: `  enkryptify configure --token=ek_...
   enkryptify configure --skip-token --environment=123`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error getting current directory: %v\n", err)
-			return
+			return fmt.Errorf("error getting current directory: %v", err)
 		}
 
 		cm, err := config.NewConfigManager()
 		if err != nil {
-			fmt.Printf("Error creating config manager: %v\n", err)
-			return
+			return fmt.Errorf("error creating config manager: %v", err)
 		}
 
 		token := ""
@@ -47,8 +45,7 @@ var configureCmd = &cobra.Command{
 		if skipToken {
 			_, token, _, err = cm.GetConfig(cwd)
 			if err != nil {
-				fmt.Printf("Error getting config: %v\n", err)
-				return
+				return fmt.Errorf("error getting config: %v", err)
 			}
 		}
 
@@ -65,8 +62,7 @@ var configureCmd = &cobra.Command{
 				var accessToken textInput.Output
 				tprogram := tea.NewProgram(textInput.InitialModel(&accessToken, "Enter your project token", "ek_..."))
 				if _, err := tprogram.Run(); err != nil {
-					fmt.Println("Error:", err)
-					return
+					return err
 				}
 
 				token = accessToken.Output
@@ -74,11 +70,9 @@ var configureCmd = &cobra.Command{
 		}
 
 		if len(token) == 0 {
-			fmt.Println("No project token provided")
-			return
+			return fmt.Errorf("no project token provided")
 		} else if !APIKeyIsValid(token) {
-			fmt.Println("Invalid project token")
-			return
+			return fmt.Errorf("invalid project token")
 		}
 
 		client := api.NewClient(token)
@@ -86,8 +80,7 @@ var configureCmd = &cobra.Command{
 
 		var tokenResponse api.TokenResponse
 		if err := client.GetToken(ctx, &tokenResponse); err != nil {
-			fmt.Printf("Invalid project token: %v\n", err)
-			return
+			return fmt.Errorf("invalid project token: %v", err)
 		}
 
 		// Part II: Environment
@@ -97,15 +90,13 @@ var configureCmd = &cobra.Command{
 		if environmentID == 0 && environmentIDFlag != 0 {
 			environmentID = environmentIDFlag
 		} else if environmentID != 0 && environmentIDFlag != 0 && environmentIDFlag != environmentID {
-			fmt.Println("This token is unauthorized for this environment")
-			return
+			return fmt.Errorf("this token is unauthorized for this environment")
 		}
 
 		if environmentID == 0 && environmentIDFlag == 0 {
 			var environments api.EnvironmentResponse
 			if err := client.GetEnvironments(ctx, tokenResponse.Data.ProjectID, &environments); err != nil {
-				fmt.Printf("Invalid project token: %v\n", err)
-				return
+				return fmt.Errorf("invalid project token: %v", err)
 			}
 
 			environmentOptions := make([]selectInput.Item, len(environments.Data))
@@ -116,22 +107,19 @@ var configureCmd = &cobra.Command{
 			var environmentSelection selectInput.Selection
 			environmentModel := selectInput.InitialModel(environmentOptions, &environmentSelection, "Select an environment")
 			if _, err := tea.NewProgram(environmentModel).Run(); err != nil {
-				fmt.Printf("Error selecting environment: %v\n", err)
-				return
+				return fmt.Errorf("error selecting environment: %v", err)
 			}
 
 			envID, err := strconv.ParseInt(environmentSelection.Choice, 10, 64)
 			if err != nil {
-				fmt.Printf("Error selecting environment: %v\n", err)
-				return
+				return fmt.Errorf("error selecting environment: %v", err)
 			}
 
 			environmentID = envID
 		}
 
 		if environmentID == 0 {
-			fmt.Println("No environment selected")
-			return
+			return fmt.Errorf("no environment selected")
 		}
 
 		config := config.Config{
@@ -142,11 +130,11 @@ var configureCmd = &cobra.Command{
 		}
 
 		if err := cm.SetConfig(config, token, tokenResponse.Data.Key); err != nil {
-			fmt.Printf("Error adding config: %v\n", err)
-			return
+			return fmt.Errorf("error adding config: %v", err)
 		}
 
 		fmt.Println("Configuration saved successfully")
+		return nil
 	},
 }
 
