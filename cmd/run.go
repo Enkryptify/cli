@@ -27,51 +27,43 @@ var runCmd = &cobra.Command{
 	Example: `  enkryptify run -- npm run start
   enkryptify run -- node server.js
   enkryptify run --command="npm run build && npm run start"`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		command, _ := cmd.Flags().GetString("command")
 
 		if command == "" && len(args) == 0 {
-			fmt.Println("Error: either provide a command with --command or arguments after --")
-			cmd.Help()
-			os.Exit(1)
+			return fmt.Errorf("either provide a command with --command or arguments after --")
 		}
 
 		if runtime.GOOS == "ios" || runtime.GOOS == "android" ||
 			runtime.GOOS == "js" || runtime.GOOS == "wasip1" {
-			fmt.Printf("This command is not supported on %s, please email us at support@enkryptify.com\n", runtime.GOOS)
-			os.Exit(1)
+			return fmt.Errorf("this command is not supported on %s, please email us at support@enkryptify.com", runtime.GOOS)
 		}
 
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error getting current directory: %v\n", err)
-			return
+			return fmt.Errorf("error getting current directory: %v", err)
 		}
 
 		cm, err := config.NewConfigManager()
 		if err != nil {
-			fmt.Printf("Error creating config manager: %v\n", err)
-			return
+			return fmt.Errorf("error creating config manager: %v", err)
 		}
 
 		cfg, token, projectKey, err := cm.GetConfig(cwd)
 		if err != nil {
-			fmt.Printf("No configuration found for directory %s: %v\n", cwd, err)
-			return
+			return fmt.Errorf("no configuration found for directory %s: %v", cwd, err)
 		}
 
 		parts := strings.Split(token, "_")
 		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
 		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
 		if err != nil {
-			fmt.Printf("Error creating decryption service: %v\n", err)
-			return
+			return fmt.Errorf("error creating decryption service: %v", err)
 		}
 
 		projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
 		if err != nil {
-			fmt.Printf("Error decrypting project key: %v\n", err)
-			return
+			return fmt.Errorf("error decrypting project key: %v", err)
 		}
 
 		projectKeyBytes := []byte(projectKeyDecrypted)
@@ -81,24 +73,23 @@ var runCmd = &cobra.Command{
 
 		var secrets api.SecretResponse
 		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
-			fmt.Printf("Error getting secrets: %v\n", err)
-			return
+			return fmt.Errorf("error getting secrets: %v", err)
 		}
 
 		env := os.Environ()
 		for _, secret := range secrets.Data {
 			decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
 			if err != nil {
-				fmt.Printf("Error decrypting secret %s: %v\n", secret.Name, err)
-				continue
+				return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
 			}
 			env = append(env, fmt.Sprintf("%s=%s", secret.Name, decryptedValue))
 		}
 
 		if err := runCommand(command, args, env, cwd); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			return fmt.Errorf("error running command: %v", err)
 		}
+
+		return nil
 	},
 }
 
@@ -162,6 +153,11 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 		proc = exec.Command(shell, shellArg, command)
 	} else {
 		executable := args[0]
+		if _, err := os.Stat("/.dockerenv"); err == nil {
+			if path, err := exec.LookPath(executable); err == nil {
+				executable = path
+			}
+		}
 
 		if runtime.GOOS == "windows" {
 			if !strings.Contains(executable, ".") {

@@ -31,6 +31,7 @@ const (
 type ConfigManager struct {
 	configs    []Config
 	configPath string
+	credStore  CredentialStore
 }
 
 func sanitizePath(path string) string {
@@ -48,9 +49,17 @@ func NewConfigManager() (*ConfigManager, error) {
 		return nil, err
 	}
 
+	storeDir := filepath.Join(home, configDir)
 	configPath := filepath.Join(home, configDir, configFile)
+
+	credStore, err := GetCredentialStore(storeDir)
+	if err != nil {
+		return nil, err
+	}
+
 	cm := &ConfigManager{
 		configPath: configPath,
+		credStore:  credStore,
 	}
 
 	if err := cm.load(); err != nil {
@@ -110,12 +119,14 @@ func (cm *ConfigManager) SetConfig(config Config, token string, projectKey strin
 		return err
 	}
 
-	if err := keyring.Set(servicePrefix+"-project-key-"+absPath, "ek-cli", projectKey); err != nil {
-		os.Setenv(envProjectKeyPrefix+sanitizePath(absPath), projectKey)
+	if err := cm.credStore.Set(servicePrefix+"-project-key-"+absPath, "ek-cli", projectKey); err != nil {
+		return err
 	}
-	if err := keyring.Set(servicePrefix+"-token-"+absPath, "ek-cli", token); err != nil {
-		os.Setenv(envTokenPrefix+sanitizePath(absPath), token)
+
+	if err := cm.credStore.Set(servicePrefix+"-token-"+absPath, "ek-cli", token); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -127,18 +138,13 @@ func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, string, err
 
 	for _, cfg := range cm.configs {
 		if cfg.DirectoryPath == absPath {
-			token, tokenErr := keyring.Get(servicePrefix+"-token-"+absPath, "ek-cli")
-			projectKey, projectKeyErr := keyring.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
-
-			if tokenErr != nil {
-				token = os.Getenv(envTokenPrefix + sanitizePath(absPath))
+			token, tokenErr := cm.credStore.Get(servicePrefix+"-token-"+absPath, "ek-cli")
+			projectKey, projectKeyErr := cm.credStore.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
+			if tokenErr != nil || projectKeyErr != nil {
+				return nil, "", "", os.ErrNotExist
 			}
 			if projectKeyErr != nil {
 				projectKey = os.Getenv(envProjectKeyPrefix + sanitizePath(absPath))
-			}
-
-			if token == "" || projectKey == "" {
-				return nil, "", "", os.ErrNotExist
 			}
 
 			return &cfg, token, projectKey, nil
