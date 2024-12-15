@@ -4,9 +4,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/zalando/go-keyring"
+)
+
+const (
+	envTokenPrefix      = "ENKRYPTIFY_TOKEN_"
+	envProjectKeyPrefix = "ENKRYPTIFY_PROJECT_KEY_"
 )
 
 type Config struct {
@@ -26,6 +32,15 @@ type ConfigManager struct {
 	configs    []Config
 	configPath string
 	credStore  CredentialStore
+}
+
+func sanitizePath(path string) string {
+	invalid := []string{"/", "\\", ":", " ", "-"}
+	result := path
+	for _, char := range invalid {
+		result = strings.ReplaceAll(result, char, "_")
+	}
+	return result
 }
 
 func NewConfigManager() (*ConfigManager, error) {
@@ -127,6 +142,9 @@ func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, string, err
 			projectKey, projectKeyErr := cm.credStore.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
 			if tokenErr != nil || projectKeyErr != nil {
 				return nil, "", "", os.ErrNotExist
+			}
+			if projectKeyErr != nil {
+				projectKey = os.Getenv(envProjectKeyPrefix + sanitizePath(absPath))
 			}
 
 			return &cfg, token, projectKey, nil
