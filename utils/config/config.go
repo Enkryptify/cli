@@ -16,8 +16,8 @@ const (
 )
 
 type Config struct {
-	ProjectID     int64  `json:"project_id"`
-	EnvironmentID int64  `json:"environment_id"`
+	ProjectID     string `json:"project_id"`
+	EnvironmentID string `json:"environment_id"`
 	PublicKey     string `json:"public_key"`
 	DirectoryPath string `json:"directory_path"`
 }
@@ -140,11 +140,14 @@ func (cm *ConfigManager) GetConfig(dirPath string) (*Config, string, string, err
 		if cfg.DirectoryPath == absPath {
 			token, tokenErr := cm.credStore.Get(servicePrefix+"-token-"+absPath, "ek-cli")
 			projectKey, projectKeyErr := cm.credStore.Get(servicePrefix+"-project-key-"+absPath, "ek-cli")
-			if tokenErr != nil || projectKeyErr != nil {
+			if tokenErr != nil {
 				return nil, "", "", os.ErrNotExist
 			}
 			if projectKeyErr != nil {
 				projectKey = os.Getenv(envProjectKeyPrefix + sanitizePath(absPath))
+				if projectKey == "" {
+					return nil, "", "", os.ErrNotExist
+				}
 			}
 
 			return &cfg, token, projectKey, nil

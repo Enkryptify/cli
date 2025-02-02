@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/Enkryptify/cli/api"
@@ -20,7 +19,7 @@ import (
 func init() {
 	configureCmd.Flags().StringP("token", "t", "", "Project token (or set ENKRYPTIFY_TOKEN environment variable)")
 	configureCmd.Flags().Bool("skip-token", false, "Keep the same token, useful for changing environments")
-	configureCmd.Flags().Int64P("environment", "e", 0, "Environment ID")
+	configureCmd.Flags().StringP("environment", "e", "", "Environment ID")
 	rootCmd.AddCommand(configureCmd)
 }
 
@@ -84,16 +83,16 @@ var configureCmd = &cobra.Command{
 		}
 
 		// Part II: Environment
-		environmentIDFlag, _ := cmd.Flags().GetInt64("environment")
+		environmentIDFlag, _ := cmd.Flags().GetString("environment")
 		environmentID := tokenResponse.Data.EnvironmentID
 
-		if environmentID == 0 && environmentIDFlag != 0 {
+		if environmentID == "" && environmentIDFlag != "" {
 			environmentID = environmentIDFlag
-		} else if environmentID != 0 && environmentIDFlag != 0 && environmentIDFlag != environmentID {
+		} else if environmentID != "" && environmentIDFlag != "" && environmentIDFlag != environmentID {
 			return fmt.Errorf("this token is unauthorized for this environment")
 		}
 
-		if environmentID == 0 && environmentIDFlag == 0 {
+		if environmentID == "" && environmentIDFlag == "" {
 			var environments api.EnvironmentResponse
 			if err := client.GetEnvironments(ctx, tokenResponse.Data.ProjectID, &environments); err != nil {
 				return fmt.Errorf("invalid project token: %v", err)
@@ -101,7 +100,7 @@ var configureCmd = &cobra.Command{
 
 			environmentOptions := make([]selectInput.Item, len(environments.Data))
 			for i, environment := range environments.Data {
-				environmentOptions[i] = selectInput.Item{Title: environment.Name, ID: strconv.FormatInt(environment.ID, 10)}
+				environmentOptions[i] = selectInput.Item{Title: environment.Name, ID: environment.ID}
 			}
 
 			var environmentSelection selectInput.Selection
@@ -110,15 +109,10 @@ var configureCmd = &cobra.Command{
 				return fmt.Errorf("error selecting environment: %v", err)
 			}
 
-			envID, err := strconv.ParseInt(environmentSelection.Choice, 10, 64)
-			if err != nil {
-				return fmt.Errorf("error selecting environment: %v", err)
-			}
-
-			environmentID = envID
+			environmentID = environmentSelection.Choice
 		}
 
-		if environmentID == 0 {
+		if environmentID == "" {
 			return fmt.Errorf("no environment selected")
 		}
 
