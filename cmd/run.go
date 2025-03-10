@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Enkryptify/cli/api"
 	"github.com/Enkryptify/cli/utils/config"
@@ -179,9 +181,59 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 
-	err := proc.Run()
-	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+	var procErr error
+
+	go func() {
+		select {
+		case <-sigChan:
+			cancel()
+
+			if runtime.GOOS != "windows" {
+				if proc.Process != nil {
+					_ = syscall.Kill(-proc.Process.Pid, syscall.SIGINT)
+				}
+			}
+
+			signal.Stop(sigChan)
+
+			select {
+			case <-done:
+			case <-time.After(500 * time.Millisecond):
+				if proc.Process != nil {
+					_ = proc.Process.Kill()
+				}
+			}
+		case <-ctx.Done():
+			// Context was cancelled elsewhere, do nothing
+		}
+	}()
+
+	if runtime.GOOS != "windows" {
+		proc.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+		}
+	}
+
+	if err := proc.Start(); err != nil {
+		close(done)
+		return fmt.Errorf("error starting command: %v", err)
+	}
+
+	go func() {
+		procErr = proc.Wait()
+		close(done)
+	}()
+
+	<-done
+
+	if procErr != nil {
+		if exitError, ok := procErr.(*exec.ExitError); ok {
 			switch runtime.GOOS {
 			case "windows":
 				os.Exit(exitError.ExitCode())
@@ -195,7 +247,7 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 				}
 			}
 		}
-		return fmt.Errorf("error running command: %v", err)
+		return fmt.Errorf("error running command: %v", procErr)
 	}
 
 	return nil
