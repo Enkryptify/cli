@@ -96,22 +96,14 @@ var exportCmd = &cobra.Command{
 			return fmt.Errorf("no configuration found for directory %s: %v", cwd, err)
 		}
 
-		parts := strings.Split(token, "_")
-		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
-		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
-		if err != nil {
-			return fmt.Errorf("error creating decryption service: %v", err)
-		}
-
-		projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
-		if err != nil {
-			return fmt.Errorf("error decrypting project key: %v", err)
-		}
-
-		projectKeyBytes := []byte(projectKeyDecrypted)
-
 		client := api.NewClient(token)
 		ctx := context.Background()
+
+		var pr api.ProjectResponse
+		if err := client.GetProjectByID(ctx, cfg.ProjectID, &pr); err != nil {
+			return fmt.Errorf("error fetching project info: %v", err)
+		}
+		e2ee := pr.Data.EndToEndEncryption
 
 		var secrets api.SecretResponse
 		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
@@ -119,16 +111,39 @@ var exportCmd = &cobra.Command{
 		}
 
 		decryptedSecrets := make(map[string]string)
-		for _, secret := range secrets.Data {
-			if !exportConfig.shouldIncludeSecret(secret) {
-				continue
+		if e2ee {
+			parts := strings.Split(token, "_")
+			privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
+			decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
+			if err != nil {
+				return fmt.Errorf("error creating decryption service: %v", err)
 			}
 
-			decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
+			projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
 			if err != nil {
-				return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
+				return fmt.Errorf("error decrypting project key: %v", err)
 			}
-			decryptedSecrets[secret.Name] = decryptedValue
+
+			projectKeyBytes := []byte(projectKeyDecrypted)
+
+			for _, secret := range secrets.Data {
+				if !exportConfig.shouldIncludeSecret(secret) {
+					continue
+				}
+
+				decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
+				if err != nil {
+					return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
+				}
+				decryptedSecrets[secret.Name] = decryptedValue
+			}
+		} else {
+			for _, secret := range secrets.Data {
+				if !exportConfig.shouldIncludeSecret(secret) {
+					continue
+				}
+				decryptedSecrets[secret.Name] = secret.Value
+			}
 		}
 
 		if err := exportSecrets(exportConfig, decryptedSecrets); err != nil {

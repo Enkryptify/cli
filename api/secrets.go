@@ -22,7 +22,21 @@ type TokenResponse struct {
 }
 
 func (c *Client) GetToken(ctx context.Context, token *TokenResponse) error {
-	return c.doRequest(ctx, http.MethodGet, "/integrations/token", nil, token)
+	return c.doRequest(ctx, http.MethodGet, "/cli/token", nil, token)
+}
+
+type Project struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	EndToEndEncryption bool   `json:"endToEndEncryption"`
+}
+
+type ProjectResponse struct {
+	Data Project `json:"data"`
+}
+
+func (c *Client) GetProjectByID(ctx context.Context, projectId string, project *ProjectResponse) error {
+	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/cli/project/%s", projectId), nil, project)
 }
 
 type Environment struct {
@@ -35,7 +49,7 @@ type EnvironmentResponse struct {
 }
 
 func (c *Client) GetEnvironments(ctx context.Context, projectId string, environments *EnvironmentResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/project/%s/environment", projectId), nil, environments)
+	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/cli/project/%s/environment", projectId), nil, environments)
 }
 
 type Secret struct {
@@ -49,5 +63,5 @@ type SecretResponse struct {
 }
 
 func (c *Client) GetSecrets(ctx context.Context, projectId string, environmentId string, secrets *SecretResponse) error {
-	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/integrations/project/%s/environment/%s/secret", projectId, environmentId), nil, secrets)
+	return c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/cli/project/%s/environment/%s/secret", projectId, environmentId), nil, secrets)
 }

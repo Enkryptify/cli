@@ -56,39 +56,56 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("no configuration found for directory %s: %v", cwd, err)
 		}
 
-		parts := strings.Split(token, "_")
-		privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
-		decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
-		if err != nil {
-			return fmt.Errorf("error creating decryption service: %v", err)
-		}
-
-		projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
-		if err != nil {
-			return fmt.Errorf("error decrypting project key: %v", err)
-		}
-
-		projectKeyBytes := []byte(projectKeyDecrypted)
-
 		client := api.NewClient(token)
 		ctx := context.Background()
+
+		var pr api.ProjectResponse
+		if err := client.GetProjectByID(ctx, cfg.ProjectID, &pr); err != nil {
+			return fmt.Errorf("error fetching project info: %v", err)
+		}
+		e2ee := pr.Data.EndToEndEncryption
 
 		var secrets api.SecretResponse
 		if err := client.GetSecrets(ctx, cfg.ProjectID, cfg.EnvironmentID, &secrets); err != nil {
 			return fmt.Errorf("error getting secrets: %v", err)
 		}
 
-		env := os.Environ()
-		for _, secret := range secrets.Data {
-			decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
+		if e2ee {
+			parts := strings.Split(token, "_")
+			privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
+			decryptor, err := encryption.NewDecryptor(privateKey, cfg.PublicKey)
 			if err != nil {
-				return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
+				return fmt.Errorf("error creating decryption service: %v", err)
 			}
-			env = append(env, fmt.Sprintf("%s=%s", secret.Name, decryptedValue))
-		}
 
-		if err := runCommand(command, args, env, cwd); err != nil {
-			return fmt.Errorf("error running command: %v", err)
+			projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
+			if err != nil {
+				return fmt.Errorf("error decrypting project key: %v", err)
+			}
+
+			projectKeyBytes := []byte(projectKeyDecrypted)
+
+			env := os.Environ()
+			for _, secret := range secrets.Data {
+				decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
+				if err != nil {
+					return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
+				}
+				env = append(env, fmt.Sprintf("%s=%s", secret.Name, decryptedValue))
+			}
+
+			if err := runCommand(command, args, env, cwd); err != nil {
+				return fmt.Errorf("error running command: %v", err)
+			}
+		} else {
+			env := os.Environ()
+			for _, secret := range secrets.Data {
+				env = append(env, fmt.Sprintf("%s=%s", secret.Name, secret.Value))
+			}
+
+			if err := runCommand(command, args, env, cwd); err != nil {
+				return fmt.Errorf("error running command: %v", err)
+			}
 		}
 
 		return nil
