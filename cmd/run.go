@@ -70,6 +70,8 @@ var runCmd = &cobra.Command{
 			return fmt.Errorf("error getting secrets: %v", err)
 		}
 
+		// prepare environment with (possibly decrypted) secrets
+		env := os.Environ()
 		if e2ee {
 			parts := strings.Split(token, "_")
 			privateKey := base64.StdEncoding.EncodeToString([]byte(parts[1]))
@@ -77,37 +79,28 @@ var runCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("error creating decryption service: %v", err)
 			}
-
 			projectKeyDecrypted, err := decryptor.Decrypt(projectKey)
 			if err != nil {
 				return fmt.Errorf("error decrypting project key: %v", err)
 			}
-
-			projectKeyBytes := []byte(projectKeyDecrypted)
-
-			env := os.Environ()
+			keyBytes := []byte(projectKeyDecrypted)
 			for _, secret := range secrets.Data {
-				decryptedValue, err := encryption.DecryptSecretValue(secret.Value, projectKeyBytes[:])
+				dv, err := encryption.DecryptSecretValue(secret.Value, keyBytes)
 				if err != nil {
 					return fmt.Errorf("error decrypting secret %s: %v", secret.Name, err)
 				}
-				env = append(env, fmt.Sprintf("%s=%s", secret.Name, decryptedValue))
-			}
-
-			if err := runCommand(command, args, env, cwd); err != nil {
-				return fmt.Errorf("error running command: %v", err)
+				env = append(env, fmt.Sprintf("%s=%s", secret.Name, dv))
 			}
 		} else {
-			env := os.Environ()
 			for _, secret := range secrets.Data {
 				env = append(env, fmt.Sprintf("%s=%s", secret.Name, secret.Value))
 			}
-
-			if err := runCommand(command, args, env, cwd); err != nil {
-				return fmt.Errorf("error running command: %v", err)
-			}
 		}
 
+		// finally run the user’s command with our augmented env
+		if err := runCommand(command, args, env, cwd); err != nil {
+			return fmt.Errorf("error running command: %v", err)
+		}
 		return nil
 	},
 }
@@ -119,31 +112,20 @@ func getShellAndFlag() (shell string, flag string) {
 			return "powershell.exe", "-Command"
 		}
 		return "cmd.exe", "/C"
-
 	case "plan9":
 		return "rc", "-c"
-
 	case "ios", "android", "js", "wasip1":
 		return "", ""
-
 	default:
-		shells := []struct {
-			path string
-			flag string
-		}{
-			{"bash", "-c"},
-			{"zsh", "-c"},
-			{"ksh", "-c"},
-			{"ash", "-c"},
-			{"sh", "-c"},
+		candidates := []struct{ path, flag string }{
+			{"bash", "-c"}, {"zsh", "-c"}, {"ksh", "-c"},
+			{"ash", "-c"}, {"sh", "-c"},
 		}
-
-		for _, s := range shells {
-			if _, err := exec.LookPath(s.path); err == nil {
-				return s.path, s.flag
+		for _, c := range candidates {
+			if _, err := exec.LookPath(c.path); err == nil {
+				return c.path, c.flag
 			}
 		}
-
 		return "sh", "-c"
 	}
 }
@@ -155,41 +137,37 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 	}
 
 	var proc *exec.Cmd
-
 	if command != "" {
 		shell, shellArg := getShellAndFlag()
 		if shell == "" {
 			return fmt.Errorf("no suitable shell found for this platform")
 		}
-
+		// normalize && on various shells
 		switch {
 		case shell == "powershell.exe":
 			command = strings.ReplaceAll(command, "&&", ";")
-		case shell == "rc": // Plan 9
+		case shell == "rc":
 			command = strings.ReplaceAll(command, "&&", " && ")
 		}
-
 		proc = exec.Command(shell, shellArg, command)
 	} else {
-		executable := args[0]
+		exe := args[0]
+		// Docker fallback
 		if _, err := os.Stat("/.dockerenv"); err == nil {
-			if path, err := exec.LookPath(executable); err == nil {
-				executable = path
+			if p, err := exec.LookPath(exe); err == nil {
+				exe = p
 			}
 		}
-
-		if runtime.GOOS == "windows" {
-			if !strings.Contains(executable, ".") {
-				for _, ext := range []string{".exe", ".cmd", ".bat"} {
-					if path, err := exec.LookPath(executable + ext); err == nil {
-						executable = path
-						break
-					}
+		// Windows extensions
+		if runtime.GOOS == "windows" && !strings.Contains(exe, ".") {
+			for _, ext := range []string{".exe", ".cmd", ".bat"} {
+				if p, err := exec.LookPath(exe + ext); err == nil {
+					exe = p
+					break
 				}
 			}
 		}
-
-		proc = exec.Command(executable, args[1:]...)
+		proc = exec.Command(exe, args[1:]...)
 	}
 
 	proc.Env = env
@@ -198,6 +176,12 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
 
+	// set up process group on Unix, no‑op on Windows
+	if p := newSysProcAttr(); p != nil {
+		proc.SysProcAttr = p
+	}
+
+	// signal handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -210,15 +194,8 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 		select {
 		case <-sigChan:
 			cancel()
-
-			if runtime.GOOS != "windows" {
-				if proc.Process != nil {
-					_ = syscall.Kill(-proc.Process.Pid, syscall.SIGINT)
-				}
-			}
-
+			killProcessGroup(proc)
 			signal.Stop(sigChan)
-
 			select {
 			case <-done:
 			case <-time.After(500 * time.Millisecond):
@@ -227,15 +204,8 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 				}
 			}
 		case <-ctx.Done():
-			// Context was cancelled elsewhere, do nothing
 		}
 	}()
-
-	if runtime.GOOS != "windows" {
-		proc.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid: true,
-		}
-	}
 
 	if err := proc.Start(); err != nil {
 		close(done)
@@ -255,17 +225,16 @@ func runCommand(command string, args []string, env []string, cwd string) error {
 			case "windows":
 				os.Exit(exitError.ExitCode())
 			case "plan9":
-				if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
-					os.Exit(status.ExitStatus())
+				if st, ok := exitError.Sys().(syscall.WaitStatus); ok {
+					os.Exit(st.ExitStatus())
 				}
 			default:
-				if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
-					os.Exit(status.ExitStatus())
+				if st, ok := exitError.Sys().(syscall.WaitStatus); ok {
+					os.Exit(st.ExitStatus())
 				}
 			}
 		}
 		return fmt.Errorf("error running command: %v", procErr)
 	}
-
 	return nil
 }
