@@ -30,10 +30,6 @@ builds:
             goarch: '386'
           - goos: freebsd
             goarch: '386'
-          - goos: windows
-            goarch: arm
-          - goos: windows
-            goarch: arm64
       ldflags:
           - -s -w
           - -X main.version={{.Version}}
