@@ -24,12 +24,16 @@ builds:
           - 6
           - 7
       ignore:
-      - goos: darwin
-        goarch: '386'
-      - goos: windows
-        goarch: '386'
-      - goos: freebsd
-        goarch: '386'
+          - goos: darwin
+            goarch: '386'
+          - goos: windows
+            goarch: '386'
+          - goos: freebsd
+            goarch: '386'
+          - goos: windows
+            goarch: arm
+          - goos: windows
+            goarch: arm64
       ldflags:
           - -s -w
           - -X main.version={{.Version}}
@@ -100,12 +104,12 @@ nfpms:
           - apk
 
 scoops:
-  - repository:
-      owner: Enkryptify
-      name: scoop-enkryptify
-    commit_author:
-      name: "Enkryptify Bot"
-      email: bot@enkryptify.com
-    homepage: "https://enkryptify.com"
-    description: "Official Enkryptify CLI for injecting secrets into your codebase"
-    license: GPL-3.0-only
+    - repository:
+          owner: Enkryptify
+          name: scoop-enkryptify
+      commit_author:
+          name: 'Enkryptify Bot'
+          email: bot@enkryptify.com
+      homepage: 'https://enkryptify.com'
+      description: 'Official Enkryptify CLI for injecting secrets into your codebase'
+      license: GPL-3.0-only
