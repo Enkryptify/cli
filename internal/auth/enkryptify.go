@@ -280,7 +280,7 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 	)
 	
 	// Show instructions and open browser
-	ui.ShowAuthInstructions(authURL)
+	showAuthInstructions(authURL)
 	
 	if err := browser.OpenURL(authURL); err != nil {
 		ui.PrintWarning("Failed to open browser automatically. Please open the URL manually.")
@@ -443,3 +443,22 @@ func (e *EnkryptifyAuth) GetAccessToken() (string, error) {
 }
 
 
+func showAuthInstructions(authURL string) {
+	ui.PrintTitle("🔐 Enkryptify Authentication")
+	ui.PrintSubtitle("To authenticate with Enkryptify, please follow these steps:")
+	
+	fmt.Println()
+	ui.PrintInfo("1. A web browser will open automatically")
+	ui.PrintInfo("2. If the browser doesn't open, manually visit the URL below")
+	ui.PrintInfo("3. Sign in to your Enkryptify account")
+	ui.PrintInfo("4. Authorize the CLI application")
+	ui.PrintInfo("5. Return to this terminal once you've completed the authorization")
+
+	ui.PrintSeparator()
+	
+	fmt.Println()
+	ui.PrintInfo("Authentication URL:\n" + authURL)
+	fmt.Println()
+	
+	ui.PrintSeparator()
+}
