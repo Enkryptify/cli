@@ -125,8 +125,6 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 	server := &http.Server{Addr: ":" + CallbackPort}
 	
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		defer server.Shutdown(context.Background())
-		
 		// Check for errors
 		if errCode := r.URL.Query().Get("error"); errCode != "" {
 			errDesc := r.URL.Query().Get("error_description")
@@ -140,13 +138,24 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 			fmt.Fprintf(w, `
 				<html>
 					<head><title>Authentication Error</title></head>
-					<body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-						<h2 style="color: #FF5F56;">Authentication Error</h2>
-						<p>%s</p>
-						<p>You can close this window and try again.</p>
+					<body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
+						<h2 style="color: #E64545;">Authentication Error</h2>
+						<p style="color: #F7F7F7;">%s</p>
+						<p style="color: #F7F7F7;">You can close this window and try again.</p>
 					</body>
 				</html>
 			`, errDesc)
+			
+			// Ensure response is sent before shutting down
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			
+			// Delay shutdown to allow browser to receive response
+			go func() {
+				time.Sleep(1 * time.Second)
+				server.Shutdown(context.Background())
+			}()
 			
 			errorResult <- fmt.Errorf("authentication error: %s", errDesc)
 			return
@@ -157,6 +166,18 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 		if receivedState != state {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "Invalid state parameter")
+			
+			// Ensure response is sent before shutting down
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			
+			// Delay shutdown to allow browser to receive response
+			go func() {
+				time.Sleep(1 * time.Second)
+				server.Shutdown(context.Background())
+			}()
+			
 			errorResult <- fmt.Errorf("invalid state parameter")
 			return
 		}
@@ -166,6 +187,18 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 		if code == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "Missing authorization code")
+			
+			// Ensure response is sent before shutting down
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			
+			// Delay shutdown to allow browser to receive response
+			go func() {
+				time.Sleep(1 * time.Second)
+				server.Shutdown(context.Background())
+			}()
+			
 			errorResult <- fmt.Errorf("missing authorization code")
 			return
 		}
@@ -175,6 +208,18 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "Failed to exchange code for token")
+			
+			// Ensure response is sent before shutting down
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			
+			// Delay shutdown to allow browser to receive response
+			go func() {
+				time.Sleep(1 * time.Second)
+				server.Shutdown(context.Background())
+			}()
+			
 			errorResult <- fmt.Errorf("failed to exchange code for token: %w", err)
 			return
 		}
@@ -185,13 +230,24 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 		fmt.Fprintf(w, `
 			<html>
 				<head><title>Authentication Successful</title></head>
-				<body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-					<h2 style="color: #28CA42;">✓ Authentication Successful!</h2>
-					<p>You have successfully authenticated with Enkryptify.</p>
-					<p>You can now close this window and return to your terminal.</p>
+				<body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
+					<h2 style="color: #2AC769;">Authentication Successful!</h2>
+					<p style="color: #F7F7F7;">You have successfully authenticated with Enkryptify.</p>
+					<p style="color: #F7F7F7;">You can now close this window and return to your terminal.</p>
 				</body>
 			</html>
 		`)
+		
+		// Ensure response is sent before shutting down
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		
+		// Delay shutdown to allow browser to receive response
+		go func() {
+			time.Sleep(1 * time.Second)
+			server.Shutdown(context.Background())
+		}()
 		
 		authResult <- *authResp
 	})
