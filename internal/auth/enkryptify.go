@@ -100,7 +100,9 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 			ui.ShowAuthSuccess(userInfo.Email)
 			return nil
 		}
-		// If we can't get user info, continue with login
+		// If we can't get user info (token expired/invalid), clear stored auth and proceed with login
+		ui.PrintWarning("Stored authentication is invalid or expired. Starting fresh login...")
+		e.keyring.DeleteAuthInfo("enkryptify")
 	}
 
 	// Generate PKCE parameters
@@ -378,64 +380,10 @@ func (e *EnkryptifyAuth) GetAccessToken() (string, error) {
 	
 	// Check if token is expired (with 5 minute buffer)
 	if authInfo.ExpiresAt > 0 && time.Now().Unix() > (authInfo.ExpiresAt-300) {
-		// Token is expired, try to refresh if we have a refresh token
-		if authInfo.RefreshToken != "" {
-			newToken, err := e.refreshAccessToken(authInfo.RefreshToken)
-			if err != nil {
-				return "", fmt.Errorf("failed to refresh token: %w", err)
-			}
-			return newToken, nil
-		}
-		return "", fmt.Errorf("access token expired and no refresh token available")
+		return "", fmt.Errorf("access token expired, please run login command")
 	}
 	
 	return authInfo.AccessToken, nil
 }
 
-// refreshAccessToken refreshes an expired access token
-func (e *EnkryptifyAuth) refreshAccessToken(refreshToken string) (string, error) {
-	data := url.Values{}
-	data.Set("grant_type", "refresh_token")
-	data.Set("client_id", ClientID)
-	data.Set("refresh_token", refreshToken)
-	
-	req, err := http.NewRequest("POST", TokenEndpoint, strings.NewReader(data.Encode()))
-	if err != nil {
-		return "", err
-	}
-	
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	
-	resp, err := e.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token refresh failed with status %d", resp.StatusCode)
-	}
-	
-	var authResp AuthResponse
-	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
-		return "", err
-	}
-	
-	// Update stored auth info
-	authInfo, err := e.keyring.GetAuthInfo("enkryptify")
-	if err != nil {
-		return "", err
-	}
-	
-	authInfo.AccessToken = authResp.AccessToken
-	if authResp.ExpiresIn > 0 {
-		authInfo.ExpiresAt = time.Now().Unix() + authResp.ExpiresIn
-	}
-	
-	if err := e.keyring.StoreAuthInfo("enkryptify", authInfo); err != nil {
-		return "", fmt.Errorf("failed to update auth info: %w", err)
-	}
-	
-	return authResp.AccessToken, nil
-}
+
