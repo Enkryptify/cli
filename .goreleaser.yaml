@@ -5,7 +5,7 @@ before:
         - go mod tidy
 
 builds:
-    - binary: enkryptify
+    - binary: ek
       env:
           - CGO_ENABLED=0
       goos:
@@ -76,7 +76,7 @@ brews:
       description: 'Official Enkryptify CLI for injecting secrets into your codebase'
       license: 'GPL-3.0-only'
       test: |
-          system "#{bin}/enkryptify --version"
+          system "#{bin}/ek --version"
 
 nfpms:
     - id: enkryptify
