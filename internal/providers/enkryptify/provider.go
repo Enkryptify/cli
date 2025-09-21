@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	BaseAPIURL = "http://localhost:8080/v1"
+	BaseAPIURL = "https://api.enkryptify.com/v1"
 )
 
 type Client struct {

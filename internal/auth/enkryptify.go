@@ -22,9 +22,9 @@ import (
 
 const (
 	ClientID           = "enkryptify-cli"
-	AuthBaseURL        = "http://localhost:3000"
-	TokenEndpoint      = "http://localhost:8080/v1/auth/token"
-	UserInfoEndpoint   = "http://localhost:8080/v1/me"
+	AuthBaseURL        = "https://app.enkryptify.com"
+	TokenEndpoint      = "https://api.enkryptify.com/v1/auth/token"
+	UserInfoEndpoint   = "https://api.enkryptify.com/v1/me"
 	RedirectURL        = "http://localhost:51823/callback"
 	CallbackPort       = "51823"
 	DefaultScopes      = "openid profile email secrets:read secrets:write"
