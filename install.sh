@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.1.2"
+VERSION="0.1.6"
 set -e
 
 if [ -t 1 ]; then
@@ -48,16 +48,16 @@ esac
 echo -e "${YELLOW}Downloading Enkryptify CLI ${VERSION} for ${OS} ${ARCH}...${NC}"
 
 if ! TMPDIR=$(mktemp -d 2>/dev/null); then
-    TMPDIR="/tmp/enkryptify-$(date +%s)"
+    TMPDIR="/tmp/ek-$(date +%s)"
     mkdir -p "$TMPDIR"
 fi
 
 DOWNLOAD_URL="https://github.com/Enkryptify/cli/releases/download/v${VERSION}/enkryptify_${OS}_${ARCH}.tar.gz"
 
 if command -v curl >/dev/null 2>&1; then
-    curl -L "${DOWNLOAD_URL}" -o "${TMPDIR}/enkryptify.tar.gz"
+    curl -L "${DOWNLOAD_URL}" -o "${TMPDIR}/ek.tar.gz"
 elif command -v wget >/dev/null 2>&1; then
-    wget -O "${TMPDIR}/enkryptify.tar.gz" "${DOWNLOAD_URL}"
+    wget -O "${TMPDIR}/ek.tar.gz" "${DOWNLOAD_URL}"
 else
     echo -e "${RED}Error: Neither curl nor wget found. Please install either curl or wget.${NC}"
     rm -rf "${TMPDIR}"
@@ -65,7 +65,7 @@ else
 fi
 
 echo -e "${YELLOW}Installing Enkryptify CLI...${NC}"
-tar xzf "${TMPDIR}/enkryptify.tar.gz" -C "${TMPDIR}"
+tar xzf "${TMPDIR}/ek.tar.gz" -C "${TMPDIR}"
 
 INSTALL_DIR="/usr/local/bin"
 if [ "$OS" = "Darwin" ]; then
@@ -77,15 +77,15 @@ if [ "$OS" = "Darwin" ]; then
 fi
 
 if [ -w "$INSTALL_DIR" ]; then
-    install -m 755 "${TMPDIR}/enkryptify" "$INSTALL_DIR/enkryptify"
+    install -m 755 "${TMPDIR}/ek" "$INSTALL_DIR/ek"
 else
-    sudo install -m 755 "${TMPDIR}/enkryptify" "$INSTALL_DIR/enkryptify"
+    sudo install -m 755 "${TMPDIR}/ek" "$INSTALL_DIR/ek"
 fi
 
 rm -rf "${TMPDIR}"
-if command -v enkryptify >/dev/null 2>&1; then
+if command -v ek >/dev/null 2>&1; then
     echo -e "${GREEN}Enkryptify CLI installed successfully!${NC}"
-    enkryptify --version
+    ek --version
 else
     if [ "$INSTALL_DIR" = "$HOME/bin" ]; then
         echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$HOME/.profile"

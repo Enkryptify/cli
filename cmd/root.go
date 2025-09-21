@@ -7,10 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.4"
+var version = "0.1.6"
 
 var rootCmd = &cobra.Command{
-	Use:   "enkryptify",
+	Use:   "ek",
 	Short: "Enkryptify CLI",
 	Long: `
    _____       _                     _   _  __       
@@ -32,6 +32,5 @@ func Execute() {
 
 func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "Get the current version of the CLI")
-	rootCmd.SetVersionTemplate(`{{.Version}}
-`)
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
 }
