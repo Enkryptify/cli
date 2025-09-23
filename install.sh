@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.1.7"
+VERSION="0.1.8"
 set -e
 
 if [ -t 1 ]; then
