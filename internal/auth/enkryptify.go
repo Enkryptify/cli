@@ -387,7 +387,7 @@ func (e *EnkryptifyAuth) GetUserInfo(accessToken string) (*UserInfo, error) {
 		return nil, err
 	}
 	
-	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-API-Key", accessToken)
 	req.Header.Set("Accept", "application/json")
 	
 	resp, err := e.httpClient.Do(req)
