@@ -122,7 +122,7 @@ func (e *EnkryptifyAuth) Login(ctx context.Context) error {
 	authResult := make(chan AuthResponse, 1)
 	errorResult := make(chan error, 1)
 	
-	server := &http.Server{Addr: ":" + CallbackPort}
+	server := &http.Server{Addr: ":" + CallbackPort, ReadTimeout: 5 * time.Second}
 	
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		// Check for errors
