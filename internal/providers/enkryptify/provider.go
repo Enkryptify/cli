@@ -69,6 +69,19 @@ type SecretValue struct {
 	Value         string `json:"value"`
 }
 
+type ProjectTokenResponse struct {
+	ID        string `json:"id"`
+	Workspace struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+	} `json:"workspace"`
+	Project struct {
+		ID   string `json:"id"`
+		Slug string `json:"slug"`
+	} `json:"project"`
+	EnvironmentID string `json:"environmentId"`
+}
+
 func NewClient() *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
@@ -154,4 +167,14 @@ func (c *Client) GetSecrets(workspaceSlug, projectSlug, environmentID string) ([
 	}
 
 	return secrets, nil
+}
+
+func (c *Client) GetProjectTokenDetails() (*ProjectTokenResponse, error) {
+	var tokenDetails ProjectTokenResponse
+
+	if err := c.makeRequest("GET", "/auth/project-token", &tokenDetails); err != nil {
+		return nil, fmt.Errorf("failed to get project token details: %w", err)
+	}
+
+	return &tokenDetails, nil
 }
