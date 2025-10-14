@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Enkryptify/cli/internal/auth"
 	"github.com/Enkryptify/cli/internal/config"
 	"github.com/Enkryptify/cli/internal/providers/enkryptify"
 	"github.com/Enkryptify/cli/internal/ui"
@@ -36,9 +38,6 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ui.ShowBrandHeader()
-	ui.PrintTitle("🔗 Enkryptify Repository Setup")
-
 	currentPath, err := config.GetCurrentWorkingDirectory()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
@@ -48,6 +47,61 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load setup configuration: %w", err)
 	}
+
+	client := enkryptify.NewClient()
+
+	// Check if using environment variable token (for server environments)
+	if token := os.Getenv(auth.EnvTokenKey); token != "" {
+		return runNonInteractiveSetup(currentPath, setupStorage, client)
+	}
+
+	// Interactive setup for user authentication
+	return runInteractiveSetup(currentPath, setupStorage, client)
+}
+
+// runNonInteractiveSetup handles setup for server environments using env token
+func runNonInteractiveSetup(currentPath string, setupStorage *config.SetupStorage, client *enkryptify.Client) error {
+	// Fetch project details from the token
+	tokenDetails, err := client.GetProjectTokenDetails()
+	if err != nil {
+		return fmt.Errorf("failed to fetch project token details: %w", err)
+	}
+
+	// Check if setup already exists
+	if setupStorage.HasSetupForPath(currentPath) {
+		existingSetup := setupStorage.GetSetupForPath(currentPath)
+		// In non-interactive mode, we just overwrite silently
+		fmt.Printf("Updating existing setup for %s\n", currentPath)
+		fmt.Printf("Previous: workspace=%s, project=%s, environment=%s\n", 
+			existingSetup.WorkspaceSlug, existingSetup.ProjectSlug, existingSetup.EnvironmentID)
+	}
+
+	// Create setup config from token details
+	setupConfig := config.SetupConfig{
+		Path:          currentPath,
+		WorkspaceSlug: tokenDetails.Workspace.Slug,
+		ProjectSlug:   tokenDetails.Project.Slug,
+		EnvironmentID: tokenDetails.EnvironmentID,
+	}
+
+	setupStorage.AddOrUpdateSetup(setupConfig)
+	if err := setupStorage.Save(); err != nil {
+		return fmt.Errorf("failed to save setup configuration: %w", err)
+	}
+
+	fmt.Printf("✓ Setup completed successfully!\n")
+	fmt.Printf("  Workspace: %s\n", tokenDetails.Workspace.Slug)
+	fmt.Printf("  Project: %s\n", tokenDetails.Project.Slug)
+	fmt.Printf("  Environment: %s\n", tokenDetails.EnvironmentID)
+	fmt.Printf("  Path: %s\n", currentPath)
+
+	return nil
+}
+
+// runInteractiveSetup handles setup with interactive prompts for user authentication
+func runInteractiveSetup(currentPath string, setupStorage *config.SetupStorage, client *enkryptify.Client) error {
+	ui.ShowBrandHeader()
+	ui.PrintTitle("🔗 Enkryptify Repository Setup")
 
 	if setupStorage.HasSetupForPath(currentPath) {
 		existingSetup := setupStorage.GetSetupForPath(currentPath)
@@ -60,8 +114,6 @@ func runSetup(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 	}
-
-	client := enkryptify.NewClient()
 
 	ui.ShowProgress(1, 3, "Fetching workspaces...")
 	workspaces, err := client.GetWorkspaces()

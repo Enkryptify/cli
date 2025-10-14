@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ const (
 	RedirectURL        = "http://localhost:51823/callback"
 	CallbackPort       = "51823"
 	DefaultScopes      = "openid profile email secrets:read secrets:write"
+	EnvTokenKey        = "ENKRYPTIFY_TOKEN"
 )
 
 // EnkryptifyAuth handles authentication with Enkryptify
@@ -76,6 +78,12 @@ func generateCodeChallenge(verifier string) string {
 
 // Login performs the OAuth login flow with Enkryptify
 func (e *EnkryptifyAuth) Login(ctx context.Context) error {
+	// Check if using environment variable token
+	if token := os.Getenv(EnvTokenKey); token != "" {
+		ui.PrintInfo(fmt.Sprintf("Authenticated using %s environment variable", EnvTokenKey))
+		return nil
+	}
+	
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
@@ -410,6 +418,11 @@ func (e *EnkryptifyAuth) GetUserInfo(accessToken string) (*UserInfo, error) {
 
 // IsAuthenticated checks if the user is authenticated
 func (e *EnkryptifyAuth) IsAuthenticated() (bool, error) {
+	// Check for environment variable token first (for server environments)
+	if token := os.Getenv(EnvTokenKey); token != "" {
+		return true, nil
+	}
+	
 	return e.keyring.IsAuthenticated("enkryptify")
 }
 
@@ -425,6 +438,11 @@ func (e *EnkryptifyAuth) Logout() error {
 
 // GetAccessToken retrieves the current access token
 func (e *EnkryptifyAuth) GetAccessToken() (string, error) {
+	// Check for environment variable token first (for server environments)
+	if token := os.Getenv(EnvTokenKey); token != "" {
+		return token, nil
+	}
+	
 	authInfo, err := e.keyring.GetAuthInfo("enkryptify")
 	if err != nil {
 		return "", err

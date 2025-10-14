@@ -29,6 +29,10 @@ This command will open a web browser to complete the OAuth authentication flow.
 After successful authentication, your credentials will be securely stored
 in your system's keyring.
 
+For server environments where browser authentication is not possible, you can
+set the ENKRYPTIFY_TOKEN environment variable with your API token:
+  export ENKRYPTIFY_TOKEN=your_api_token_here
+
 Examples:
   ek login              # Login with default provider (Enkryptify)
   ek login --force      # Force re-authentication even if already logged in
