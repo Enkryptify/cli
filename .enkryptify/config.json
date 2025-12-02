@@ -1,0 +1,11 @@
+{
+  "setups": {},
+  "providers": {
+    "enkryptify": {
+      "settings": {
+        "authenticated": true,
+        "last_login": 1764703530020
+      }
+    }
+  }
+}
