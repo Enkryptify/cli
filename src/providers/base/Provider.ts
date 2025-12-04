@@ -5,6 +5,7 @@ import type { LoginOptions } from "@/providers/base/AuthProvider.js";
  * Secret structure - normalized across all providers
  */
 export interface Secret {
+    id: string;
     /**
      * Secret name/key
      */
@@ -13,26 +14,18 @@ export interface Secret {
      * Secret value
      */
     value: string;
+
+    isPersonal: boolean;
+
+    environmentId: string;
     /**
      * Optional provider-specific metadata
      */
-    metadata?: {
-        [key: string]: any;
-    };
 }
+export interface runOptions {
+    env?: string;
 
-/**
- * Setup options passed to provider.setup()
- */
-export interface SetupOptions {
-    /**
-     * Current directory path where setup is being performed
-     */
-    path: string;
-    /**
-     * Provider-specific options
-     */
-    [key: string]: any;
+    [key: string]: string | undefined;
 }
 
 /**
@@ -86,7 +79,7 @@ export interface Provider {
      * @param options Setup options including current directory path
      * @returns ProjectConfig to be saved to .enkryptify.json
      */
-    setup(options: SetupOptions): Promise<ProjectConfig>;
+    setup(options: string): Promise<ProjectConfig>;
 
     /**
      * Fetch secrets from the provider
@@ -96,7 +89,7 @@ export interface Provider {
      * @param config Provider-specific configuration
      * @returns Array of normalized secrets
      */
-    run(config: ProviderConfig): Promise<Secret[]>;
+    run(config: ProviderConfig, options?: runOptions): Promise<Secret[]>;
 
     /**
      * Create a new secret
@@ -135,5 +128,5 @@ export interface Provider {
      * @param config Provider-specific configuration
      * @returns Array of normalized secrets
      */
-    listSecrets(config: ProviderConfig): Promise<Secret[]>;
+    // listSecrets(config: ProviderConfig): Promise<Secret[]>;
 }

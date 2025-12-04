@@ -50,12 +50,7 @@ export class EnkryptifyAuth implements AuthProvider {
                 if (isAuth) {
                     console.log("Already authenticated. Use --force to re-authenticate.");
 
-                    const provider = await configManager.getProvider(this.PROVIDER_NAME);
-                    const nowSec = Math.floor(Date.now() / 1000);
-
-                    await configManager.updateProvider(this.PROVIDER_NAME, {
-                        ...(provider ?? {}),
-                    });
+                    await configManager.updateProvider(this.PROVIDER_NAME, {});
                     return;
                 } else {
                     await keyring.delete(this.PROVIDER_NAME);
@@ -239,9 +234,7 @@ export class EnkryptifyAuth implements AuthProvider {
 
         const provider = await configManager.getProvider(this.PROVIDER_NAME);
 
-        await configManager.updateProvider(this.PROVIDER_NAME, {
-            ...(provider ?? {}),
-        });
+        await configManager.updateProvider(this.PROVIDER_NAME, {});
     }
 
     async getUserInfo(token: string): Promise<UserInfo | null> {

@@ -1,6 +1,4 @@
-// i know better name
-// also this file will add more to it basically it will have functions for the whole project
-
+// just put it back in the auth
 export function authErrorResponse(message: string): Response {
     return new Response(
         `<html>

@@ -1,3 +1,4 @@
+import { keyring } from "@/lib/keyring.js";
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 
 const http: AxiosInstance = axios.create({
@@ -7,6 +8,25 @@ const http: AxiosInstance = axios.create({
         Accept: "application/json",
     },
 });
+
+http.interceptors.request.use(
+    async (config) => {
+        try {
+            const authData = await keyring.get("enkryptify");
+            const token = authData?.accessToken;
+
+            if (token) {
+                config.headers = config.headers ?? {};
+                (config.headers as any)["X-API-Key"] = token;
+            }
+        } catch {
+            throw new Error("invalid token, pls run ek login first");
+        }
+
+        return config;
+    },
+    (error) => Promise.reject(error),
+);
 
 const ERROR_MESSAGES: Record<number, string> = {
     401: "Authentication failed. Please check your credentials.",
