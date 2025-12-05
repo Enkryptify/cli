@@ -8,17 +8,8 @@ import React from "react";
 
 let finalProviderName: string;
 
-export async function runLogin(providerName?: string, options?: LoginOptions): Promise<void> {
+export async function runLogin(providerName: string, options?: LoginOptions): Promise<void> {
     const abortController = new AbortController();
-
-    process.once("SIGINT", () => {
-        console.log("\n  Login cancelled by user");
-        abortController.abort();
-    });
-
-    if (!providerName) {
-        throw new Error("No provider specified. Please specify a provider: ek login <provider>");
-    }
 
     const provider = providerRegistry.get(providerName);
     if (!provider) {
@@ -42,6 +33,22 @@ export function registerLoginCommand(program: Command) {
         .argument("<provider>", "Provider name...")
         .option("-f, --force", "Force re-authentication even if already logged in")
         .action(async (provider: string, options: LoginOptions & { force?: boolean }) => {
+            if (!provider) {
+                console.error("\nError: No provider specified. Please specify a provider: ek login <provider>");
+                process.exit(1);
+            }
+
+            const providerInstance = providerRegistry.get(provider);
+            if (!providerInstance) {
+                console.error(
+                    `\nError: Provider "${provider}" not found. Available providers: ${providerRegistry
+                        .list()
+                        .map((p) => p.name)
+                        .join(", ")}`,
+                );
+                process.exit(1);
+            }
+
             let app: ReturnType<typeof render> | null = null;
 
             try {
@@ -59,7 +66,10 @@ export function registerLoginCommand(program: Command) {
                 if (app) {
                     app.unmount();
                 }
-                console.error("\nError:", error instanceof Error ? error.message : String(error));
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (!errorMessage.includes("Provider") && !errorMessage.includes("No provider")) {
+                    console.error("\nError:", errorMessage);
+                }
                 process.exit(1);
             }
         });

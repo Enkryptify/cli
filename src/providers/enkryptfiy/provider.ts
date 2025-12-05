@@ -1,12 +1,12 @@
 import { config, type ProjectConfig } from "@/lib/config.js";
+import { getSecureInput, getTextInput } from "@/lib/input.js";
 import type { LoginOptions } from "@/providers/base/AuthProvider.js";
-import type { Provider, ProviderConfig, runOptions, Secret } from "@/providers/base/Provider.js";
+import type { Provider, runOptions, Secret } from "@/providers/base/Provider.js";
 import { EnkryptifyAuth } from "@/providers/enkryptfiy/auth.js";
 import http from "@/providers/enkryptfiy/httpClient.js";
 import { confirm } from "@/ui/Confirm";
-import { showSecretsTable } from "@/ui/SecretsTable.js";
 import { selectName } from "@/ui/SelectItem";
-import { showSuccessMessage } from "@/ui/SuccessMessage";
+import { showMessage } from "@/ui/SuccessMessage";
 import { AxiosError } from "axios";
 
 type Workspace = {
@@ -42,22 +42,43 @@ type ApiSecret = {
 
 export class EnkryptifyProvider implements Provider {
     private auth: EnkryptifyAuth;
+    readonly name = "enkryptify";
 
     constructor() {
         this.auth = new EnkryptifyAuth();
     }
-    listSecrets(config: ProviderConfig): Promise<Secret[]> {
-        throw new Error("Method not implemented.");
-    }
 
-    readonly name = "enkryptify";
+    async listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]> {
+        const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
+
+        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
+            params: { environment_id: config.environment_id },
+        });
+
+        const shouldShow = showValues === "show";
+        const currentEnvId = config.environment_id;
+
+        const secretsValues: Secret[] = response.data.map((secret) => {
+            const matching = secret.values.find((v) => v.environmentId === currentEnvId);
+
+            return {
+                id: secret.id,
+                name: secret.name,
+                value: shouldShow && matching ? (matching.value ?? "") : "*********",
+                isPersonal: matching?.isPersonal ?? false,
+                environmentId: shouldShow && matching ? (matching.environmentId ?? "") : "*********",
+            };
+        });
+
+        return secretsValues;
+    }
 
     async login(options?: LoginOptions): Promise<void> {
         await this.auth.login(options);
     }
 
-    async setup(options: string): Promise<ProjectConfig> {
-        const setup = await config.getSetup(options);
+    async configure(options: string): Promise<ProjectConfig> {
+        const setup = await config.getConfigure(options);
         if (setup) {
             const overwrite = await confirm("Setup already exists. Overwrite?");
             if (!overwrite) {
@@ -117,12 +138,15 @@ export class EnkryptifyProvider implements Provider {
             );
         }
 
-        const environmentId = await selectName(
+        const environmentName = await selectName(
             environments.map((e) => e.name),
             "Select environment",
         );
 
-        if (!environmentId) throw new Error("Failed to select environment");
+        if (!environmentName) throw new Error("Failed to select environment");
+
+        const environmentId = environments.find((e) => e.name === environmentName)?.id;
+        if (!environmentId) throw new Error("Failed to find environment ID");
 
         const projectConfig: ProjectConfig = {
             path: options,
@@ -132,27 +156,17 @@ export class EnkryptifyProvider implements Provider {
             environment_id: environmentId,
         };
 
-        showSuccessMessage("Setup completed successfully!", [
+        showMessage("Setup completed successfully!", [
             `Workspace: ${workspaceSlug}`,
             `Project: ${projectSlug}`,
-            `Environment: ${environmentId}`,
+            `Environment: ${environmentName}`,
         ]);
 
         return projectConfig;
     }
 
     async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
-        const { workspace_slug, project_slug, environment_id } = config as ProjectConfig & {
-            workspace_slug?: string;
-            project_slug?: string;
-            environment_id?: string;
-        };
-
-        if (!workspace_slug || !project_slug || !environment_id) {
-            throw new Error(
-                "Invalid config: missing workspace_slug, project_slug, or environmentId, pls run ek setup first and ek setup",
-            );
-        }
+        const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
         const environments = await this.fetchResource<Environment>(
             `/v1/workspace/${workspace_slug}/project/${project_slug}/environment`,
@@ -189,39 +203,116 @@ export class EnkryptifyProvider implements Provider {
             };
         });
 
-        showSecretsTable(secretsValues);
         return secretsValues;
     }
 
-    async createSecret(config: ProviderConfig, name: string, value: string): Promise<void> {
-        const { workspace_slug, project_slug, environment_id } = config;
-        if (!workspace_slug || !project_slug || !environment_id) {
-            throw new Error("Invalid config: missing workspace_slug, project_slug, or environment_id");
-        }
+    async createSecret(config: ProjectConfig, name: string, value: string): Promise<void> {
+        const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
-        await http.post(`/v1/workspaces/${workspace_slug}/projects/${project_slug}/secrets`, {
-            name,
-            value,
-            environment_id,
+        await http.post(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
+            environments: [environment_id],
+            secrets: [
+                {
+                    key: name,
+                    value: value,
+                    type: "runtime",
+                    dataType: "text",
+                },
+            ],
         });
     }
 
-    async updateSecret(config: ProviderConfig, name: string, value: string): Promise<void> {
-        const { workspace_slug, project_slug, environment_id } = config;
-        if (!workspace_slug || !project_slug || !environment_id) {
-            throw new Error("Invalid config: missing workspace_slug, project_slug, or environment_id");
+    async updateSecret(config: ProjectConfig, name: string): Promise<void> {
+        const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
+
+        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
+            params: { environment_id: environment_id },
+        });
+
+        if (response.data.length === 0) {
+            throw new Error("No secrets found. Please create a secret first.");
         }
 
-        await http.put(`/v1/workspaces/${workspace_slug}/projects/${project_slug}/secrets/${name}`, {
-            value,
-            environment_id,
+        if (!name || !name.trim()) {
+            throw new Error(
+                "Secret name is required pls run ek update <secret name> " +
+                    " to update a secret. " +
+                    ` available secrets: ${response.data.map((s) => s.name).join(", ")}`,
+            );
+        }
+
+        const existingSecret = response.data.find((s) => s.name === name);
+        if (!existingSecret) {
+            throw new Error(`Secret "${name}" not found.`);
+        }
+
+        const isPersonal = existingSecret.values.find((v) => v.environmentId === environment_id)?.isPersonal ?? false;
+
+        const newNameInput = await getTextInput(`Enter new name (press Enter to keep "${name}"): `);
+        const newName = newNameInput.trim() || name;
+
+        const namePattern = /^[A-Za-z0-9_-]+$/;
+        if (!namePattern.test(newName)) {
+            throw new Error(
+                `Invalid secret name "${newName}". Name can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-).`,
+            );
+        }
+
+        if (response.data.some((s) => s.name === newName && s.id !== existingSecret.id)) {
+            throw new Error(`Secret with name "${newName}" already exists.`);
+        }
+
+        const newValue = await getSecureInput("Enter new value: ");
+        if (!newValue || !newValue.trim()) {
+            throw new Error("Secret value cannot be empty.");
+        }
+
+        await http.put(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${existingSecret.id}`, {
+            name: newName,
+            type: "runtime",
+            dataType: "text",
+            values: [
+                {
+                    environmentId: environment_id,
+                    value: newValue,
+                    isPersonal: isPersonal,
+                },
+            ],
         });
+
+        showMessage("Secret updated successfully!", [`Old name: ${name}`, `New name: ${newNameInput}`]);
     }
 
-    async deleteSecret(config: ProviderConfig, name: string): Promise<void> {
-        const { workspace_slug, project_slug } = config;
-        if (!workspace_slug || !project_slug) {
-            throw new Error("Invalid config: missing workspace_slug or project_slug");
+    async deleteSecret(config: ProjectConfig): Promise<void> {
+        const { workspace_slug, project_slug, environment_id } = config;
+
+        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
+            params: { environment_id: environment_id },
+        });
+
+        if (response.data.length === 0) {
+            throw new Error("No secrets found. Please create a secret first.");
+        }
+
+        const apiSecrets = response.data;
+        console.log(apiSecrets);
+
+        const selcetedSecret = await selectName(
+            apiSecrets.map((ws) => `${ws.name}`),
+            "select A secert To delete",
+        );
+        if (!selcetedSecret) throw new Error("Failed to select secret to delete");
+
+        let secretId = apiSecrets.find((s) => s.name === selcetedSecret)?.id;
+        if (!secretId) throw new Error("Failed to find secret ID");
+
+        console.log(secretId);
+        try {
+            await http.delete(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secretId}`);
+            showMessage("Secret deleted successfully!", []);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to delete secret: ${errorMessage}`);
         }
     }
 
@@ -241,5 +332,15 @@ export class EnkryptifyProvider implements Provider {
             }
             throw error;
         }
+    }
+
+    checkProjectConfig(config: ProjectConfig) {
+        const { workspace_slug, project_slug, environment_id } = config;
+        if (!workspace_slug || !project_slug || !environment_id) {
+            throw new Error(
+                "Invalid config: missing workspace_slug, project_slug, or environment_id pls run ek setup first",
+            );
+        }
+        return { workspace_slug, project_slug, environment_id };
     }
 }

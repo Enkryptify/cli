@@ -5,9 +5,6 @@ import type { Command } from "commander";
 
 export async function runCommand(cmd?: string[], options?: { env?: string }): Promise<void> {
     const projectConfig = await config.findProjectConfig(process.cwd());
-    if (!projectConfig) {
-        throw new Error("No project config found. Please run ek setup first.");
-    }
 
     const provider = providerRegistry.get(projectConfig.provider);
     if (!provider) {
@@ -22,7 +19,6 @@ export async function runCommand(cmd?: string[], options?: { env?: string }): Pr
     const secrets = await provider.run(projectConfig, { env: options?.env });
 
     const env = buildEnvWithSecrets(secrets);
-    Object.assign(process.env, env);
 
     if (!cmd || cmd.length === 0) {
         return;

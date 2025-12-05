@@ -2,7 +2,7 @@ import { config } from "@/lib/config.js";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
 import type { Command } from "commander";
 
-export async function runSetup(providerName: string): Promise<void> {
+export async function configure(providerName: string): Promise<void> {
     if (!providerName) {
         throw new Error("No provider specified. Please specify a provider: ek setup <provider>");
     }
@@ -23,20 +23,20 @@ export async function runSetup(providerName: string): Promise<void> {
 
     const projectPath = process.cwd();
 
-    const projectConfig = await provider.setup(projectPath);
+    const projectConfig = await provider.configure(projectPath);
 
-    await config.createSetup(projectPath, projectConfig);
+    await config.createConfigure(projectPath, projectConfig);
 
     console.log(`\n Setup complete! Configuration saved.\n`);
 }
 
-export function registerSetupCommand(program: Command) {
+export function registerConfigureCommand(program: Command) {
     program
-        .command("setup")
+        .command("configure")
         .argument("<provider>", "Provider name (e.g., enkryptify)")
         .action(async (provider: string) => {
             try {
-                await runSetup(provider);
+                await configure(provider);
             } catch (error) {
                 console.error("\n Error:", error instanceof Error ? error.message : String(error));
                 process.exit(1);

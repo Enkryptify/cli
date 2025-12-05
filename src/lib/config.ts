@@ -24,7 +24,7 @@ interface ConfigFile {
 const CONFIG_FILE = path.join(os.homedir(), ".enkryptify", "config.json");
 
 function exitWithError(message: string): never {
-    console.error("\n❌ FATAL ERROR:\n");
+    console.error("\n FATAL ERROR:\n");
     console.error(message);
     console.error("\nThe application cannot continue.\n");
     process.exit(1);
@@ -146,12 +146,7 @@ async function getProvider(providerName: string): Promise<Record<string, string>
     return config.providers?.[providerName] || null;
 }
 
-async function hasProvider(providerName: string): Promise<boolean> {
-    const config = await loadConfig();
-    return !!config.providers?.[providerName];
-}
-
-async function createSetup(projectPath: string, projectConfig: ProjectConfig): Promise<void> {
+async function createConfigure(projectPath: string, projectConfig: ProjectConfig): Promise<void> {
     const config = await loadConfig();
     const normalizedPath = path.resolve(projectPath);
 
@@ -163,36 +158,36 @@ async function createSetup(projectPath: string, projectConfig: ProjectConfig): P
     await saveConfig(config);
 }
 
-async function getSetup(projectPath: string): Promise<ProjectConfig | null> {
+async function getConfigure(projectPath: string): Promise<ProjectConfig | null> {
     const config = await loadConfig();
     const normalizedPath = path.resolve(projectPath);
     const setup = config.setups?.[normalizedPath];
     return setup ? { path: normalizedPath, ...setup } : null;
 }
 
-async function findProjectConfig(startPath: string): Promise<ProjectConfig | null> {
+async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
+    const config = await loadConfig();
     let currentPath = path.resolve(startPath);
     const root = path.parse(currentPath).root;
 
     while (currentPath !== root) {
-        const setup = await getSetup(currentPath);
-        if (setup) return setup;
+        const normalizedPath = path.resolve(currentPath);
+        const setup = config.setups?.[normalizedPath];
+        if (setup) {
+            return { path: normalizedPath, ...setup };
+        }
         currentPath = path.dirname(currentPath);
     }
 
-    return getSetup(root);
-}
-
-async function overrideSetup(projectPath: string, projectConfig: ProjectConfig): Promise<void> {
-    await createSetup(projectPath, projectConfig);
+    throw new Error(
+        "No project configuration found. Please run 'ek configure <provider>' to set up your project first.",
+    );
 }
 
 export const config = {
     updateProvider,
     getProvider,
-    hasProvider,
-    createSetup,
-    getSetup,
+    createConfigure,
+    getConfigure,
     findProjectConfig,
-    overrideSetup,
 };

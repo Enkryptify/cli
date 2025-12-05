@@ -42,6 +42,6 @@ function SuccessDisplay({ message, details }: SuccessMessageProps) {
     );
 }
 
-export function showSuccessMessage(message: string, details?: string[]): void {
+export function showMessage(message: string, details?: string[]): void {
     render(<SuccessDisplay message={message} details={details} />);
 }

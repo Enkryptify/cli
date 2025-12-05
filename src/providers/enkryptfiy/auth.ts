@@ -1,6 +1,5 @@
 import { config as configManager } from "@/lib/config.js";
 import { keyring } from "@/lib/keyring.js";
-import { authErrorResponse, authSuccessResponse } from "@/lib/utils.js";
 import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider.js";
 import http from "@/providers/enkryptfiy/httpClient.js";
 import { createHash, randomBytes } from "crypto";
@@ -122,14 +121,14 @@ export class EnkryptifyAuth implements AuthProvider {
                         setTimeout(() => {
                             fail(new Error(`authentication error: ${errorDesc}`));
                         }, 1000);
-                        return authErrorResponse(errorDesc);
+                        return self.authErrorResponse(errorDesc);
                     }
 
                     if (url.searchParams.get("state") !== state) {
                         setTimeout(() => {
                             fail(new Error("invalid state parameter"));
                         }, 1000);
-                        return authErrorResponse("Invalid state parameter");
+                        return self.authErrorResponse("Invalid state parameter");
                     }
 
                     const code = url.searchParams.get("code");
@@ -137,7 +136,7 @@ export class EnkryptifyAuth implements AuthProvider {
                         setTimeout(() => {
                             fail(new Error("missing authorization code"));
                         }, 1000);
-                        return authErrorResponse("Missing authorization code");
+                        return self.authErrorResponse("Missing authorization code");
                     }
 
                     const authResp = await self.exchangeCodeForToken(code, codeVerifier);
@@ -147,7 +146,7 @@ export class EnkryptifyAuth implements AuthProvider {
                         resolve(authResp);
                     }, 1000);
 
-                    return authSuccessResponse();
+                    return self.authSuccessResponse();
                 } catch (err: any) {
                     setTimeout(() => {
                         fail(err);
@@ -199,6 +198,33 @@ export class EnkryptifyAuth implements AuthProvider {
         console.log(`   ${authUrl}\n`);
     }
 
+    private authErrorResponse(message: string): Response {
+        return new Response(
+            `<html>
+          <head><title>Authentication Error</title></head>
+          <body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
+            <h2 style="color: #E64545;">Authentication Error</h2>
+            <p style="color: #F7F7F7;">${message}</p>
+            <p style="color: #F7F7F7;">You can close this window and try again.</p>
+          </body>
+        </html>`,
+            { status: 400, headers: { "Content-Type": "text/html" } },
+        );
+    }
+
+    private authSuccessResponse(): Response {
+        return new Response(
+            `<html>
+          <head><title>Authentication Successful</title></head>
+          <body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
+            <h2 style="color: #2AC769;">Authentication Successful!</h2>
+            <p style="color: #F7F7F7;">You have successfully authenticated with Enkryptify.</p>
+            <p style="color: #F7F7F7;">You can now close this window and return to your terminal.</p>
+          </body>
+        </html>`,
+            { status: 200, headers: { "Content-Type": "text/html" } },
+        );
+    }
     private async exchangeCodeForToken(code: string, codeVerifier: string): Promise<AuthResponse> {
         const payload = {
             grant_type: "authorization_code",
