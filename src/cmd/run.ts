@@ -25,7 +25,7 @@ export async function runCommand(cmd?: string[], options?: { env?: string }): Pr
     }
 
     const [bin, ...args] = cmd;
-    await Bun.$`${[bin, ...args]}`.env(env);
+    await Bun.$`${bin} ${args.join(" ")}`.env(env);
 }
 
 export function registerRunCommand(program: Command) {
