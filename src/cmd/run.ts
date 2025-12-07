@@ -30,7 +30,7 @@ export async function runCommand(
     }
 
     const [bin, ...args] = cmd;
-    await Bun.$`${bin} ${args.join(" ")}`.env(env);
+    await Bun.$`${bin} ${args}`.env(env);
 }
 
 export function registerRunCommand(program: Command) {
