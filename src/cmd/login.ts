@@ -1,5 +1,6 @@
 import { config as authConfig } from "@/lib/config.js";
 import type { LoginOptions } from "@/providers/base/AuthProvider.js";
+import type { Provider } from "@/providers/base/Provider";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
 import { LoginFlow } from "@/ui/LoginFlow.js";
 import type { Command } from "commander";
@@ -8,21 +9,16 @@ import React from "react";
 
 let finalProviderName: string;
 
-export async function runLogin(providerName: string, options?: LoginOptions): Promise<void> {
+export async function runLogin(
+    providerName: string,
+    providerInstance: Provider,
+    options?: LoginOptions,
+): Promise<void> {
     const abortController = new AbortController();
 
-    const provider = providerRegistry.get(providerName);
-    if (!provider) {
-        throw new Error(
-            `Provider "${providerName}" not found. Available providers: ${providerRegistry
-                .list()
-                .map((p) => p.name)
-                .join(", ")}`,
-        );
-    }
     finalProviderName = providerName;
 
-    await provider.login({ ...options, signal: abortController.signal });
+    await providerInstance.login({ ...options, signal: abortController.signal });
 
     await authConfig.updateProvider(providerName, {});
 }
@@ -56,7 +52,7 @@ export function registerLoginCommand(program: Command) {
                     React.createElement(LoginFlow, {
                         providerName: provider,
                         runLogin: async () => {
-                            await runLogin(provider, options);
+                            await runLogin(provider, providerInstance, options);
                         },
                     }) as React.ReactElement,
                 );

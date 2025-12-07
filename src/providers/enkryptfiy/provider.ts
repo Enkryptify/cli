@@ -243,7 +243,9 @@ export class EnkryptifyProvider implements Provider {
 
         const existingSecret = response.data.find((s) => s.name === name);
         if (!existingSecret) {
-            throw new Error(`Secret "${name}" not found.`);
+            throw new Error(
+                `Secret "${name}" not found.  " available secrets: ${response.data.map((s) => s.name).join(", ")}"`,
+            );
         }
 
         const isPersonal = existingSecret.values.find((v) => v.environmentId === environment_id)?.isPersonal ?? false;
@@ -280,7 +282,7 @@ export class EnkryptifyProvider implements Provider {
             ],
         });
 
-        showMessage("Secret updated successfully!", [`Old name: ${name}`, `New name: ${newNameInput}`]);
+        showMessage("Secret updated successfully!", [`name: ${newNameInput ? newNameInput : name}`]);
     }
 
     async deleteSecret(config: ProjectConfig): Promise<void> {
@@ -295,7 +297,6 @@ export class EnkryptifyProvider implements Provider {
         }
 
         const apiSecrets = response.data;
-        console.log(apiSecrets);
 
         const selcetedSecret = await selectName(
             apiSecrets.map((ws) => `${ws.name}`),
