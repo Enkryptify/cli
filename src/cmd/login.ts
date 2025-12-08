@@ -26,42 +26,48 @@ export async function runLogin(
 export function registerLoginCommand(program: Command) {
     program
         .command("login")
-        .argument("<provider>", "Provider name...")
+        .argument("[provider]", "Provider name (defaults to 'enkryptify' if available)")
         .option("-f, --force", "Force re-authentication even if already logged in")
-        .action(async (provider: string, options: LoginOptions & { force?: boolean }) => {
-            if (!provider) {
-                console.error("\nError: No provider specified. Please specify a provider: ek login <provider>");
-                process.exit(1);
-            }
+        .action(async (providerArg: string | undefined, options: LoginOptions & { force?: boolean }) => {
+            const fallbackProviderName = "enkryptify";
+            const providerName = providerArg || fallbackProviderName;
 
-            const providerInstance = providerRegistry.get(provider);
+            const providerInstance = providerRegistry.get(providerName);
+
             if (!providerInstance) {
-                console.error(
-                    `\nError: Provider "${provider}" not found. Available providers: ${providerRegistry
-                        .list()
-                        .map((p) => p.name)
-                        .join(", ")}`,
-                );
+                const availableProviders = providerRegistry
+                    .list()
+                    .map((p) => p.name)
+                    .join(", ");
+
+                if (!providerArg) {
+                    console.error(
+                        `\nError: No provider specified and default "${fallbackProviderName}" is not available.\n` +
+                            `Available providers: ${availableProviders || "none"}`,
+                    );
+                } else {
+                    console.error(
+                        `\nError: Provider "${providerName}" not found. Available providers: ${
+                            availableProviders || "none"
+                        }`,
+                    );
+                }
+
                 process.exit(1);
             }
-
-            let app: ReturnType<typeof render> | null = null;
 
             try {
-                app = render(
+                const app = render(
                     React.createElement(LoginFlow, {
-                        providerName: provider,
+                        providerName,
                         runLogin: async () => {
-                            await runLogin(provider, providerInstance, options);
+                            await runLogin(providerName, providerInstance, options);
                         },
                     }) as React.ReactElement,
                 );
 
                 await app.waitUntilExit();
             } catch (error) {
-                if (app) {
-                    app.unmount();
-                }
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 if (!errorMessage.includes("Provider") && !errorMessage.includes("No provider")) {
                     console.error("\nError:", errorMessage);

@@ -19,6 +19,8 @@ interface ConfigFile {
     providers: {
         [providerName: string]: Record<string, string>;
     };
+    lastUpdateCheck?: string;
+    latestVersion?: string;
 }
 
 const CONFIG_FILE = path.join(os.homedir(), ".enkryptify", "config.json");
@@ -97,7 +99,7 @@ export async function loadConfig(): Promise<ConfigFile> {
     }
 }
 
-async function saveConfig(config: ConfigFile): Promise<void> {
+export async function saveConfig(config: ConfigFile): Promise<void> {
     try {
         await fs.mkdir(path.dirname(CONFIG_FILE), { recursive: true });
 

@@ -9,6 +9,7 @@
     "@types/node": "^24.10.1",
     "@types/prompts": "^2.4.9",
     "@types/react": "^19.2.7",
+    "@types/semver": "^7.7.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^16.5.0",
@@ -32,6 +33,7 @@
     "open": "^11.0.0",
     "prompts": "^2.4.2",
     "react": "^19.2.0",
+    "semver": "^7.7.3",
     "zod": "^4.1.13"
   }
 }

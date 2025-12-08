@@ -11,7 +11,8 @@ export async function deleteSecretCommand(): Promise<void> {
             .list()
             .map((p) => p.name)
             .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
+        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}
+            Please run 'ek login <provider>' to login to the provider first.`);
     }
 
     await provider.deleteSecret(projectConfig);
@@ -21,7 +22,7 @@ export function registerDeleteCommand(program: Command) {
     program
         .command("delete")
         .description("Delete a secret from the current environment")
-        .action(async (name?: string) => {
+        .action(async () => {
             try {
                 await deleteSecretCommand();
             } catch (error) {

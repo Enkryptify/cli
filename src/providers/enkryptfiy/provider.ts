@@ -286,31 +286,28 @@ export class EnkryptifyProvider implements Provider {
     }
 
     async deleteSecret(config: ProjectConfig): Promise<void> {
-        const { workspace_slug, project_slug, environment_id } = config;
+        const { workspace_slug, project_slug } = config;
 
-        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
-            params: { environment_id: environment_id },
-        });
-
-        if (response.data.length === 0) {
+        const response = await this.fetchResource<ApiSecret>(
+            `/v1/workspace/${workspace_slug}/project/${project_slug}/secret`,
+        );
+        if (response.length === 0) {
             throw new Error("No secrets found. Please create a secret first.");
         }
 
-        const apiSecrets = response.data;
-
         const selcetedSecret = await selectName(
-            apiSecrets.map((ws) => `${ws.name}`),
+            response.map((ws) => `${ws.name}`),
             "select A secert To delete",
         );
         if (!selcetedSecret) throw new Error("Failed to select secret to delete");
 
-        let secretId = apiSecrets.find((s) => s.name === selcetedSecret)?.id;
+        let secretId = response.find((s) => s.name === selcetedSecret)?.id;
         if (!secretId) throw new Error("Failed to find secret ID");
+        console.log(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secretId}`);
 
-        console.log(secretId);
         try {
             await http.delete(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secretId}`);
-            showMessage("Secret deleted successfully!", []);
+            showMessage("Secret deleted successfully!", [`name: ${selcetedSecret}`]);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete secret: ${errorMessage}`);
