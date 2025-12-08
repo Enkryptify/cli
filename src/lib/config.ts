@@ -74,6 +74,29 @@ export async function loadConfig(): Promise<ConfigFile> {
                 if (!parsed.setups) parsed.setups = {};
                 if (!parsed.providers) parsed.providers = {};
             }
+            if (Array.isArray(parsed.setups)) {
+                const setupsObj: { [key: string]: { provider: string; [key: string]: string } } = {};
+
+                for (const setup of parsed.setups) {
+                    if (!setup.path) continue;
+                    const normalizedPath = path.resolve(setup.path);
+                    const { path: _, ...setupData } = setup;
+                    setupsObj[normalizedPath] = {
+                        provider: setup.provider ?? "enkryptify",
+                        ...setupData,
+                    };
+                }
+
+                if (!parsed.latestVersion) {
+                    parsed.latestVersion = null;
+                }
+                if (!parsed.lastUpdateCheck) {
+                    parsed.lastUpdateCheck = null;
+                }
+
+                parsed.setups = setupsObj;
+                await saveConfig(parsed);
+            }
 
             return parsed as ConfigFile;
         } catch (parseErr: any) {
