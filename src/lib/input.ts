@@ -17,7 +17,7 @@ export async function getSecureInput(prompt: string): Promise<string> {
         throw new Error("Input cancelled or empty");
     }
 
-    return response.value;
+    return response.value as string;
 }
 
 export async function getTextInput(prompt: string): Promise<string> {
@@ -27,5 +27,5 @@ export async function getTextInput(prompt: string): Promise<string> {
         message: prompt,
     });
 
-    return response.value || "";
+    return (response.value as string) || "";
 }

@@ -1,15 +1,16 @@
+import { logError } from "@/lib/error";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 
-export interface ProjectConfig {
+export type ProjectConfig = {
     path: string;
     provider: string;
-    [key: string]: any;
-}
+    [key: string]: string;
+};
 
-interface ConfigFile {
+type ConfigFile = {
     setups: {
         [projectPath: string]: {
             provider: string;
@@ -19,16 +20,12 @@ interface ConfigFile {
     providers: {
         [providerName: string]: Record<string, string>;
     };
-    lastUpdateCheck?: string;
-    latestVersion?: string;
-}
+};
 
 const CONFIG_FILE = path.join(os.homedir(), ".enkryptify", "config.json");
 
 function exitWithError(message: string): never {
-    console.error("\n FATAL ERROR:\n");
-    console.error(message);
-    console.error("\nThe application cannot continue.\n");
+    logError(`FATAL ERROR: ${message}\nThe application cannot continue.`);
     process.exit(1);
 }
 
@@ -38,13 +35,30 @@ async function createDefaultConfig(): Promise<ConfigFile> {
     try {
         await fs.mkdir(path.dirname(CONFIG_FILE), { recursive: true });
         await fs.writeFile(CONFIG_FILE, JSON.stringify(defaultConfig, null, 2), "utf-8");
-        console.log(`✓ Created new configuration file at "${CONFIG_FILE}"`);
         return defaultConfig;
-    } catch (err: any) {
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        const errorCode = err instanceof Error && "code" in err ? err.code : undefined;
+
+        let additionalInfo = "";
+        if (errorCode === "EACCES") {
+            additionalInfo =
+                `\nThe directory "${path.dirname(CONFIG_FILE)}" exists but you don't have write permissions.\n` +
+                `Try running: chmod 755 "${path.dirname(CONFIG_FILE)}"`;
+        } else if (errorCode === "ENOENT") {
+            additionalInfo = `\nThe parent directory does not exist and could not be created.`;
+        } else {
+            additionalInfo =
+                `\nThis might be due to:\n` +
+                `- Insufficient permissions on the directory\n` +
+                `- Disk space issues\n` +
+                `- Filesystem restrictions\n` +
+                `\nYou can try creating the directory manually:\n` +
+                `  mkdir -p "${path.dirname(CONFIG_FILE)}"`;
+        }
+
         exitWithError(
-            `Cannot create configuration file at:\n"${CONFIG_FILE}"\n\n` +
-                `Reason: ${err.message}\n` +
-                `Please check your permissions.`,
+            `Failed to create configuration file:\n"${CONFIG_FILE}"\n\n` + `Error: ${errorMessage}${additionalInfo}`,
         );
     }
 }
@@ -60,65 +74,60 @@ export async function loadConfig(): Promise<ConfigFile> {
         }
 
         try {
-            const parsed = JSON.parse(data);
+            const parsed = JSON.parse(data) as unknown;
 
             if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
                 exitWithError(
-                    `Configuration file must contain a JSON object:\n"${CONFIG_FILE}"\n\n` +
-                        `Current content is: ${Array.isArray(parsed) ? "array" : typeof parsed}\n` +
-                        `Please fix the file or delete it to start fresh.`,
+                    `Configuration file must be a JSON object:\n"${CONFIG_FILE}"\n\n` +
+                        `Found: ${Array.isArray(parsed) ? "array" : parsed === null ? "null" : typeof parsed}\n` +
+                        `Expected: { "setups": {}, "providers": {} }\n` +
+                        `Fix: Delete the file or edit it manually.`,
                 );
             }
 
-            if (!parsed.setups || !parsed.providers) {
-                if (!parsed.setups) parsed.setups = {};
-                if (!parsed.providers) parsed.providers = {};
-            }
-            if (Array.isArray(parsed.setups)) {
-                const setupsObj: { [key: string]: { provider: string; [key: string]: string } } = {};
+            const config = parsed as Partial<ConfigFile>;
 
-                for (const setup of parsed.setups) {
+            if (!config.setups) config.setups = {};
+            if (!config.providers) config.providers = {};
+            if (Array.isArray(config.setups)) {
+                const setupsObj: ConfigFile["setups"] = {};
+
+                for (const setup of config.setups as ProjectConfig[]) {
                     if (!setup.path) continue;
                     const normalizedPath = path.resolve(setup.path);
-                    const { path: _, ...setupData } = setup;
+                    const { path: _, ...setupData } = setup as ProjectConfig;
                     setupsObj[normalizedPath] = {
                         provider: setup.provider ?? "enkryptify",
-                        ...setupData,
+                        ...(setupData as Record<string, string>),
                     };
                 }
 
-                if (!parsed.latestVersion) {
-                    parsed.latestVersion = null;
-                }
-                if (!parsed.lastUpdateCheck) {
-                    parsed.lastUpdateCheck = null;
-                }
-
-                parsed.setups = setupsObj;
-                await saveConfig(parsed);
+                config.setups = setupsObj;
+                await saveConfig(config as ConfigFile);
             }
 
-            return parsed as ConfigFile;
-        } catch (parseErr: any) {
+            return config as ConfigFile;
+        } catch (parseErr: unknown) {
             exitWithError(
                 `Configuration file contains invalid JSON:\n"${CONFIG_FILE}"\n\n` +
-                    `Error: ${parseErr.message}\n` +
+                    `Error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\n` +
                     `Please fix the file or delete it to start fresh.`,
             );
         }
-    } catch (err: any) {
-        if (err.code === "ENOENT") {
+    } catch (err: unknown) {
+        if (err instanceof Error && "code" in err && err.code === "ENOENT") {
             return await createDefaultConfig();
         }
 
-        if (err.code === "EACCES") {
+        if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
                 `Permission denied reading configuration file:\n"${CONFIG_FILE}"\n\n` +
                     `Please check file permissions.`,
             );
         }
 
-        exitWithError(`Cannot access configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${err.message}`);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        exitWithError(`Cannot access configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${errorMessage}`);
     }
 }
 
@@ -129,22 +138,23 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
         const tempFile = `${CONFIG_FILE}.tmp`;
         await fs.writeFile(tempFile, JSON.stringify(config, null, 2), "utf-8");
         await fs.rename(tempFile, CONFIG_FILE);
-    } catch (err: any) {
-        if (err.code === "EACCES") {
+    } catch (err: unknown) {
+        if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
                 `Permission denied writing configuration file:\n"${CONFIG_FILE}"\n\n` +
                     `Please check file and directory permissions.`,
             );
         }
 
-        if (err.code === "EROFS") {
+        if (err instanceof Error && "code" in err && err.code === "EROFS") {
             exitWithError(
                 `Cannot write to read-only filesystem:\n"${CONFIG_FILE}"\n\n` +
                     `The filesystem is mounted as read-only.`,
             );
         }
 
-        exitWithError(`Cannot save configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${err.message}`);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        exitWithError(`Cannot save configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${errorMessage}`);
     }
 }
 

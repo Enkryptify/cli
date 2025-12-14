@@ -1,9 +1,9 @@
-import { config, type ProjectConfig } from "@/lib/config.js";
-import { getSecureInput, getTextInput } from "@/lib/input.js";
-import type { LoginOptions } from "@/providers/base/AuthProvider.js";
-import type { Provider, runOptions, Secret } from "@/providers/base/Provider.js";
-import { EnkryptifyAuth } from "@/providers/enkryptfiy/auth.js";
-import http from "@/providers/enkryptfiy/httpClient.js";
+import { type ProjectConfig, config } from "@/lib/config";
+import { getSecureInput, getTextInput } from "@/lib/input";
+import type { LoginOptions } from "@/providers/base/AuthProvider";
+import type { Provider, Secret, runOptions } from "@/providers/base/Provider";
+import { EnkryptifyAuth } from "@/providers/enkryptfiy/auth";
+import http from "@/providers/enkryptfiy/httpClient";
 import { confirm } from "@/ui/Confirm";
 import { selectName } from "@/ui/SelectItem";
 import { showMessage } from "@/ui/SuccessMessage";
@@ -21,12 +21,16 @@ type Project = {
     slug: string;
 };
 
+type ProjectTeam = {
+    projects: Project[];
+};
+
 type Environment = {
     id: string;
     name: string;
 };
 
-type Resource = Workspace | Project | Environment | ApiSecret;
+type Resource = Workspace | Project | ProjectTeam | Environment | ApiSecret;
 
 type ApiSecretValue = {
     environmentId: string;
@@ -52,14 +56,19 @@ export class EnkryptifyProvider implements Provider {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
         const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
-            params: { environment_id: config.environment_id },
+            params: { environment_id: environment_id },
         });
 
         const shouldShow = showValues === "show";
         const currentEnvId = config.environment_id;
 
         const secretsValues: Secret[] = response.data.map((secret) => {
-            const matching = secret.values.find((v) => v.environmentId === currentEnvId);
+            const personalValue = secret.values.find((v) => v.environmentId === currentEnvId && v.isPersonal === true);
+            const nonPersonalValue = secret.values.find(
+                (v) => v.environmentId === currentEnvId && v.isPersonal === false,
+            );
+
+            const matching = personalValue || nonPersonalValue;
 
             return {
                 id: secret.id,
@@ -101,7 +110,12 @@ export class EnkryptifyProvider implements Provider {
 
         if (!workspaceSlug) throw new Error("Failed to select workspace");
 
-        const projectsResponse = await this.fetchResource<any>(`/v1/workspace/${workspaceSlug}/project`);
+        const selectedWorkspace = workspaces.find((ws) => ws.slug === workspaceSlug);
+        if (!selectedWorkspace) {
+            throw new Error("Failed to find selected workspace");
+        }
+
+        const projectsResponse = await this.fetchResource<ProjectTeam>(`/v1/workspace/${workspaceSlug}/project`);
 
         const allProjects: Project[] = [];
         for (const team of projectsResponse) {
@@ -112,7 +126,7 @@ export class EnkryptifyProvider implements Provider {
 
         if (allProjects.length === 0) {
             throw new Error(
-                `No projects found in workspace "${workspaceSlug}". Please create a project first before setting up.`,
+                `No projects found in workspace "${selectedWorkspace.name}". Please create a project first before setting up.`,
             );
         }
 
@@ -134,7 +148,7 @@ export class EnkryptifyProvider implements Provider {
 
         if (environments.length === 0) {
             throw new Error(
-                `No environments found in project "${projectSlug}". Please create an environment first before setting up.`,
+                `No environments found in project "${selectedProject.name}". Please create an environment first before setting up.`,
             );
         }
 
@@ -152,15 +166,15 @@ export class EnkryptifyProvider implements Provider {
             path: options,
             provider: provider,
             workspace_slug: workspaceSlug,
+            workspace_name: selectedWorkspace.name,
             project_slug: projectSlug,
+            project_name: selectedProject.name,
             environment_id: environmentId,
         };
 
-        showMessage("Setup completed successfully!", [
-            `Workspace: ${workspaceSlug}`,
-            `Project: ${projectSlug}`,
-            `Environment: ${environmentName}`,
-        ]);
+        showMessage(
+            `Setup completed successfully! Workspace: ${selectedWorkspace.name}, Project: ${selectedProject.name}, Environment: ${environmentName}`,
+        );
 
         return projectConfig;
     }
@@ -193,7 +207,15 @@ export class EnkryptifyProvider implements Provider {
         const apiSecrets = response.data;
 
         const secretsValues: Secret[] = apiSecrets.map((secret) => {
-            const matching = secret.values.find((v) => v.environmentId === targetEnvironmentId);
+            const personalValue = secret.values.find(
+                (v) => v.environmentId === targetEnvironmentId && v.isPersonal === true,
+            );
+            const nonPersonalValue = secret.values.find(
+                (v) => v.environmentId === targetEnvironmentId && v.isPersonal === false,
+            );
+
+            const matching = personalValue || nonPersonalValue;
+
             return {
                 id: secret.id,
                 name: secret.name,
@@ -222,33 +244,33 @@ export class EnkryptifyProvider implements Provider {
         });
     }
 
-    async updateSecret(config: ProjectConfig, name: string): Promise<void> {
+    async updateSecret(config: ProjectConfig, name: string, isPersonalFlag?: boolean): Promise<void> {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
-        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
-            params: { environment_id: environment_id },
-        });
+        // Fetch all secrets without environment filter to get full secret data
+        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`);
 
         if (response.data.length === 0) {
             throw new Error("No secrets found. Please create a secret first.");
         }
 
         if (!name || !name.trim()) {
-            throw new Error(
-                "Secret name is required pls run ek update <secret name> " +
-                    " to update a secret. " +
-                    ` available secrets: ${response.data.map((s) => s.name).join(", ")}`,
-            );
+            throw new Error("Secret name is required. Please provide a secret name");
         }
 
         const existingSecret = response.data.find((s) => s.name === name);
         if (!existingSecret) {
-            throw new Error(
-                `Secret "${name}" not found.  " available secrets: ${response.data.map((s) => s.name).join(", ")}"`,
-            );
+            throw new Error(`Secret "${name}" not found.`);
         }
 
-        const isPersonal = existingSecret.values.find((v) => v.environmentId === environment_id)?.isPersonal ?? false;
+        const existingPersonalValue = existingSecret.values.find(
+            (v) => v.environmentId === environment_id && v.isPersonal === true,
+            );
+        const existingNonPersonalValue = existingSecret.values.find(
+            (v) => v.environmentId === environment_id && v.isPersonal === false,
+        );
+
+        const isPersonal = isPersonalFlag !== undefined ? isPersonalFlag : false;
 
         const newNameInput = await getTextInput(`Enter new name (press Enter to keep "${name}"): `);
         const newName = newNameInput.trim() || name;
@@ -269,45 +291,64 @@ export class EnkryptifyProvider implements Provider {
             throw new Error("Secret value cannot be empty.");
         }
 
+        const otherEnvironmentValues = existingSecret.values.filter((v) => v.environmentId !== environment_id);
+
+        const currentEnvironmentValues: ApiSecretValue[] = [];
+
+        if (isPersonal) {
+            if (existingNonPersonalValue) {
+                currentEnvironmentValues.push(existingNonPersonalValue);
+            }
+            currentEnvironmentValues.push({
+                environmentId: environment_id,
+                value: newValue,
+                isPersonal: true,
+            });
+        } else {
+            if (existingPersonalValue) {
+                currentEnvironmentValues.push(existingPersonalValue);
+            }
+            currentEnvironmentValues.push({
+                environmentId: environment_id,
+                value: newValue,
+                isPersonal: false,
+            });
+        }
+
+        const updatedValues = [...otherEnvironmentValues, ...currentEnvironmentValues];
+
         await http.put(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${existingSecret.id}`, {
             name: newName,
             type: "runtime",
             dataType: "text",
-            values: [
-                {
-                    environmentId: environment_id,
-                    value: newValue,
-                    isPersonal: isPersonal,
-                },
-            ],
+            values: updatedValues,
         });
 
-        showMessage("Secret updated successfully!", [`name: ${newNameInput ? newNameInput : name}`]);
+        showMessage(`Secret updated successfully!`);
     }
 
-    async deleteSecret(config: ProjectConfig): Promise<void> {
-        const { workspace_slug, project_slug } = config;
+    async deleteSecret(config: ProjectConfig, name: string): Promise<void> {
+        const { workspace_slug, project_slug } = this.checkProjectConfig(config);
+
+        if (!name || !name.trim()) {
+            throw new Error("Secret name is required. Please provide a secret name");
+        }
 
         const response = await this.fetchResource<ApiSecret>(
             `/v1/workspace/${workspace_slug}/project/${project_slug}/secret`,
         );
         if (response.length === 0) {
-            throw new Error("No secrets found. Please create a secret first.");
+            throw new Error("No secrets found");
         }
 
-        const selcetedSecret = await selectName(
-            response.map((ws) => `${ws.name}`),
-            "select A secert To delete",
-        );
-        if (!selcetedSecret) throw new Error("Failed to select secret to delete");
-
-        let secretId = response.find((s) => s.name === selcetedSecret)?.id;
-        if (!secretId) throw new Error("Failed to find secret ID");
-        console.log(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secretId}`);
+        const secret = response.find((s) => s.name === name);
+        if (!secret) {
+            throw new Error(`Secret "${name}" not found.`);
+        }
 
         try {
-            await http.delete(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secretId}`);
-            showMessage("Secret deleted successfully!", [`name: ${selcetedSecret}`]);
+            await http.delete(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secret.id}`);
+            showMessage(`Secret "${name}" deleted successfully!`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete secret: ${errorMessage}`);

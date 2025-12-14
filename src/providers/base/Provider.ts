@@ -1,28 +1,23 @@
-import type { ProjectConfig } from "@/lib/config.js";
-import type { LoginOptions } from "@/providers/base/AuthProvider.js";
+import type { ProjectConfig } from "@/lib/config";
+import type { LoginOptions } from "@/providers/base/AuthProvider";
 
-export interface Secret {
+export type Secret = {
     id: string;
-
     name: string;
-
     value: string;
-
     isPersonal: boolean;
-
     environmentId: string;
-}
-export interface runOptions {
+};
+
+export type runOptions = {
     env?: string;
-
     [key: string]: string | undefined;
-}
+};
 
-export interface ProviderConfig {
+export type ProviderConfig = {
     provider: string;
-
     [key: string]: string;
-}
+};
 
 export interface Provider {
     readonly name: string;
@@ -35,9 +30,9 @@ export interface Provider {
 
     createSecret(config: ProjectConfig, name: string, value: string): Promise<void>;
 
-    updateSecret(config: ProjectConfig, name: string): Promise<void>;
+    updateSecret(config: ProjectConfig, name: string, isPersonal?: boolean): Promise<void>;
 
-    deleteSecret(config: ProviderConfig): Promise<void>;
+    deleteSecret(config: ProjectConfig, name: string): Promise<void>;
 
     listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]>;
 }

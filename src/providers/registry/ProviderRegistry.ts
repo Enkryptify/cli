@@ -1,4 +1,4 @@
-import type { Provider } from "@/providers/base/Provider.js";
+import type { Provider } from "@/providers/base/Provider";
 
 export class ProviderRegistry {
     private providers: Map<string, Provider> = new Map();

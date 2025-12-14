@@ -1,6 +1,5 @@
-import { EnkryptifyProvider } from "@/providers/enkryptfiy/provider.js";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
+import { EnkryptifyProvider } from "@/providers/enkryptfiy/provider";
+import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 
 providerRegistry.register(new EnkryptifyProvider());
-
 export { providerRegistry };

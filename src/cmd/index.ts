@@ -1,10 +1,10 @@
-import { registerConfigureCommand } from "@/cmd/configure.js";
-import { registerCreateCommand } from "@/cmd/create.js";
-import { registerDeleteCommand } from "@/cmd/delete.js";
-import { registerListCommand } from "@/cmd/listCommand.js";
-import { registerLoginCommand } from "@/cmd/login.js";
-import { registerRunCommand } from "@/cmd/run.js";
-import { registerUpdateCommand } from "@/cmd/update.js";
+import { registerConfigureCommand } from "@/cmd/configure";
+import { registerCreateCommand } from "@/cmd/create";
+import { registerDeleteCommand } from "@/cmd/delete";
+import { registerListCommand } from "@/cmd/listCommand";
+import { registerLoginCommand } from "@/cmd/login";
+import { registerRunCommand } from "@/cmd/run";
+import { registerUpdateCommand } from "@/cmd/update";
 import type { Command } from "commander";
 
 export function registerCommands(program: Command) {

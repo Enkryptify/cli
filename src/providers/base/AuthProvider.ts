@@ -1,12 +1,11 @@
 export interface Credentials {
-    [key: string]: any;
+    [key: string]: string;
 }
 
-export interface LoginOptions {
+export type LoginOptions = {
+    providerName: string;
     force?: boolean;
-
-    [key: string]: any;
-}
+};
 
 export interface AuthProvider {
     login(options?: LoginOptions): Promise<void>;

@@ -1,5 +1,6 @@
-import { config } from "@/lib/config.js";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
+import { config } from "@/lib/config";
+import { logError } from "@/lib/error";
+import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import type { Command } from "commander";
 
 export async function configure(providerName: string | undefined): Promise<void> {
@@ -36,19 +37,20 @@ export async function configure(providerName: string | undefined): Promise<void>
     const projectConfig = await provider.configure(projectPath);
 
     await config.createConfigure(projectPath, projectConfig);
-
-    console.log(`\n Setup complete! Configuration saved.\n`);
 }
 
 export function registerConfigureCommand(program: Command) {
     program
         .command("configure")
-        .argument("[provider]", "Provider name (defaults to 'enkryptify' if available)")
-        .action(async (provider: string | undefined) => {
+        .alias("setup")
+        .description("Set up project with a secrets provider")
+        .option("--provider <provider>", "Provider name (defaults to 'enkryptify' if available)")
+        .action(async (options: { provider?: string }) => {
             try {
-                await configure(provider);
+                await configure(options.provider);
             } catch (error) {
-                console.error("\n Error:", error instanceof Error ? error.message : String(error));
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                logError(errorMessage);
                 process.exit(1);
             }
         });

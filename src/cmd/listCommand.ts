@@ -1,5 +1,6 @@
-import { config } from "@/lib/config.js";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
+import { config } from "@/lib/config";
+import { logError } from "@/lib/error";
+import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import { showSecretsTable } from "@/ui/SecretsTable";
 import { type Command } from "commander";
 
@@ -31,7 +32,8 @@ export function registerListCommand(program: Command) {
 
                 await ListSecretsCommand(mode);
             } catch (error) {
-                console.error("\n Error:", error instanceof Error ? error.message : String(error));
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                logError(errorMessage);
                 process.exit(1);
             }
         });

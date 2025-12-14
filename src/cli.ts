@@ -1,24 +1,43 @@
-import { registerCommands } from "@/cmd/index.js";
-import { checkForUpdate } from "@/lib/updateCli.js";
+import { registerCommands } from "@/cmd/index";
+import { env } from "@/env";
+import { logError } from "@/lib/error";
+import { setupTerminalCleanup } from "@/lib/terminal";
 import "@/providers/registry/index.js";
 import { Command } from "commander";
+import { getCompletions } from "./complete/complete";
+
+const isCompletion = process.argv[2] === "__complete";
 
 const program = new Command();
 
-program.name("ek").description("CLI for Enkryptify").version(process.env.CLI_VERSION!);
+program.configureOutput({
+    writeErr: (str) => {
+        const errorMatch = str.match(/error:\s*(.+)/i);
+        if (errorMatch && errorMatch[1]) {
+            logError(errorMatch[1].trim());
+        } else {
+            logError(str.trim());
+        }
+    },
+});
+
+program
+    .name("ek")
+    .description("CLI for Enkryptify")
+    .version(env.CLI_VERSION ?? "0.0.0", "-v, --version");
 
 registerCommands(program);
 
-checkForUpdate()
-    .then(() => {
-        program.parseAsync(process.argv).catch((error) => {
-            console.error("Fatal error:", error);
-            process.exit(1);
-        });
-    })
-    .catch(() => {
-        program.parseAsync(process.argv).catch((error) => {
-            console.error("Fatal error:", error);
-            process.exit(1);
-        });
-    });
+if (isCompletion) {
+    const words = process.argv.slice(3);
+    const completions = getCompletions(program, ["ek", ...words]);
+    console.log(completions.join("\n"));
+    process.exit(0);
+}
+
+setupTerminalCleanup();
+
+program.parseAsync(process.argv).catch((error) => {
+    logError(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+});

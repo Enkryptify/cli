@@ -1,8 +1,15 @@
-import { keyring } from "@/lib/keyring.js";
+import { env } from "@/env";
+import { keyring } from "@/lib/keyring";
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 
+type StoredAuthData = {
+    accessToken: string;
+    userId: string;
+    email: string;
+};
+
 const http: AxiosInstance = axios.create({
-    baseURL: process.env.API_BASE_URL,
+    baseURL: env.API_BASE_URL,
     headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
@@ -12,15 +19,25 @@ const http: AxiosInstance = axios.create({
 http.interceptors.request.use(
     async (config) => {
         try {
-            const authData = await keyring.get("enkryptify");
+            const authDataString = await keyring.get("enkryptify");
+            if (!authDataString) {
+                return config;
+            }
+
+            const authData = JSON.parse(authDataString) as StoredAuthData;
             const token = authData?.accessToken;
 
-            if (token) {
-                config.headers = config.headers ?? {};
-                (config.headers as any)["X-API-Key"] = token;
+            if (
+                token &&
+                typeof token === "string" &&
+                config.headers &&
+                typeof config.headers === "object" &&
+                !Array.isArray(config.headers)
+            ) {
+                config.headers["X-API-Key"] = token;
             }
-        } catch {
-            throw new Error("invalid token, pls run ek login first");
+        } catch (error) {
+            console.warn("Failed to retrieve auth token:", error instanceof Error ? error.message : String(error));
         }
 
         return config;

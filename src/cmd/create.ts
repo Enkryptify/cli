@@ -1,5 +1,7 @@
-import { config } from "@/lib/config.js";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry.js";
+import { config } from "@/lib/config";
+import { logError } from "@/lib/error";
+import { getSecureInput } from "@/lib/input";
+import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import { showMessage } from "@/ui/SuccessMessage";
 import type { Command } from "commander";
 
@@ -9,10 +11,6 @@ export async function createSecretCommand(name: string, value: string): Promise<
         throw new Error(
             `Invalid secret name "${name}". Name can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-).`,
         );
-    }
-
-    if (!value || value.trim().length === 0) {
-        throw new Error("Secret value cannot be empty. Usage: ek create <name> <value>");
     }
 
     const projectConfig = await config.findProjectConfig(process.cwd());
@@ -26,32 +24,37 @@ export async function createSecretCommand(name: string, value: string): Promise<
         throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
     }
 
+    if (!value || value.trim().length === 0) {
+        throw new Error("Secret value cannot be empty.");
+    }
+
     await provider.createSecret(projectConfig, name, value);
 
-    showMessage("Secret created successfully!", [
-        `Name: ${name}`,
-        `Value: ${value.substring(0, 20)}${value.length > 20 ? "..." : ""}`,
-    ]);
+    showMessage(`Secret created successfully! Name: ${name}`);
 }
 
 export function registerCreateCommand(program: Command) {
     program
         .command("create")
         .description("Create a new secret in the current environment")
+        .argument("<name>", "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-)")
         .argument(
-            "<name>",
-            "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-) !!Dont use quotes for the name!!",
+            "[value]",
+            'Secret value. Use quotes for values with spaces or special characters  Example: ek create <name> "my value!@#$%^&*()"',
         )
-        .argument(
-            "<value>",
-            'Secret value - use quotes for values with spaces or special characters : ek create NAME "my value!@#$%^&*()"',
-        )
-        .action(async (name: string, value: string) => {
+        .action(async (name: string, value?: string) => {
             try {
-                await createSecretCommand(name, value);
+                let secretValue = value;
+                if (!secretValue || secretValue.trim().length === 0) {
+                    secretValue = await getSecureInput("Enter secret value: ");
+                    if (!secretValue || secretValue.trim().length === 0) {
+                        throw new Error("Secret value cannot be empty please provide a value.");
+                    }
+                }
+                await createSecretCommand(name, secretValue);
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error("\n Error:", errorMessage);
+                logError(errorMessage);
                 process.exit(1);
             }
         });

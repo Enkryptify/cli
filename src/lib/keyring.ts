@@ -3,26 +3,23 @@ import * as keytar from "keytar";
 const SERVICE_NAME = "enkryptify-cli";
 
 export interface Keyring {
-    set(key: string, value: any): Promise<void>;
-    get(key: string): Promise<any | null>;
+    set(key: string, value: string): Promise<void>;
+    get(key: string): Promise<string | null>;
     delete(key: string): Promise<void>;
     has(key: string): Promise<boolean>;
 }
 
 class OSKeyring implements Keyring {
-    async set(key: string, value: any): Promise<void> {
-        const serialized = JSON.stringify(value);
-        await keytar.setPassword(SERVICE_NAME, key, serialized);
+    async set(key: string, value: string): Promise<void> {
+        await keytar.setPassword(SERVICE_NAME, key, value);
     }
 
-    async get(key: string): Promise<any | null> {
+    async get(key: string): Promise<string | null> {
         try {
-            const serialized = await keytar.getPassword(SERVICE_NAME, key);
-            if (!serialized) {
-                return null;
-            }
-            return JSON.parse(serialized);
-        } catch (error) {
+            const value = await keytar.getPassword(SERVICE_NAME, key);
+            return value;
+        } catch (error: unknown) {
+            console.warn(error instanceof Error ? error.message : String(error));
             return null;
         }
     }
@@ -30,8 +27,8 @@ class OSKeyring implements Keyring {
     async delete(key: string): Promise<void> {
         try {
             await keytar.deletePassword(SERVICE_NAME, key);
-        } catch (error) {
-            // Ignore if key doesn't exist
+        } catch (error: unknown) {
+            console.warn(error instanceof Error ? error.message : String(error));
         }
     }
 

@@ -1,7 +1,8 @@
-import { config as configManager } from "@/lib/config.js";
-import { keyring } from "@/lib/keyring.js";
-import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider.js";
-import http from "@/providers/enkryptfiy/httpClient.js";
+import { env } from "@/env";
+import { config as configManager } from "@/lib/config";
+import { keyring } from "@/lib/keyring";
+import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider";
+import http from "@/providers/enkryptfiy/httpClient";
 import { createHash, randomBytes } from "crypto";
 import open from "open";
 import { URL } from "url";
@@ -16,6 +17,12 @@ type AuthResponse = {
     accessToken: string;
     tokenType: string;
     expiresIn: number;
+};
+
+type StoredAuthData = {
+    accessToken: string;
+    userId: string;
+    email: string;
 };
 
 function base64Url(buf: Buffer) {
@@ -35,14 +42,13 @@ export class EnkryptifyAuth implements AuthProvider {
         try {
             const creds = await this.getCredentials();
             envToken = creds.accessToken;
-        } catch (error) {
-            console.warn("No credentials found, continuing with login flow...");
+        } catch (error: unknown) {
+            console.warn(error instanceof Error ? error.message : String(error));
             envToken = undefined;
         }
 
         if (envToken) {
             if (options?.force) {
-                console.log("Force flag is set, deleting environment token...");
                 await keyring.delete(this.PROVIDER_NAME);
             } else {
                 const isAuth = await this.getUserInfo(envToken).catch(() => false);
@@ -65,7 +71,6 @@ export class EnkryptifyAuth implements AuthProvider {
             codeVerifier,
             codeChallenge,
             state,
-            signal: (options as any)?.signal,
         });
 
         const userInfo = await this.getUserInfo(authResponse.accessToken);
@@ -80,27 +85,16 @@ export class EnkryptifyAuth implements AuthProvider {
         codeVerifier: string;
         codeChallenge: string;
         state: string;
-        signal?: AbortSignal;
     }): Promise<AuthResponse> {
-        const { codeVerifier, codeChallenge, state, signal } = params;
+        const { codeVerifier, codeChallenge, state } = params;
 
         return new Promise<AuthResponse>((resolve, reject) => {
             const self = this;
-
-            if (signal?.aborted) {
-                reject(new Error("Login cancelled by user"));
-                return;
-            }
-
-            const abortHandler = () => {
-                fail(new Error("Login cancelled by user"));
-            };
-            signal?.addEventListener("abort", abortHandler);
             let server: ReturnType<typeof Bun.serve> | null = null;
             let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
             function cleanup() {
-                server?.stop();
+                void server?.stop();
                 if (timeoutId) clearTimeout(timeoutId);
                 server = null;
                 timeoutId = null;
@@ -147,9 +141,9 @@ export class EnkryptifyAuth implements AuthProvider {
                     }, 1000);
 
                     return self.authSuccessResponse();
-                } catch (err: any) {
+                } catch (err: unknown) {
                     setTimeout(() => {
-                        fail(err);
+                        fail(err instanceof Error ? err : new Error(String(err)));
                     }, 1000);
                     return new Response("Internal error", { status: 500 });
                 }
@@ -180,7 +174,7 @@ export class EnkryptifyAuth implements AuthProvider {
     }
 
     private buildAuthUrl(codeChallenge: string, state: string): string {
-        const authUrl = new URL("/oauth/authorize", "https://app.enkryptify.com");
+        const authUrl = new URL("/oauth/authorize", env.APP_BASE_URL);
         authUrl.searchParams.set("client_id", this.CLIENT_ID);
         authUrl.searchParams.set("response_type", "code");
         authUrl.searchParams.set("redirect_uri", this.REDIRECT_URL);
@@ -252,13 +246,14 @@ export class EnkryptifyAuth implements AuthProvider {
     }
 
     private async markAuthenticated(accessToken: string, user: UserInfo): Promise<void> {
-        await keyring.set(this.PROVIDER_NAME, {
-            accessToken,
-            userId: user.id,
-            email: user.email,
-        });
-
-        const provider = await configManager.getProvider(this.PROVIDER_NAME);
+        await keyring.set(
+            this.PROVIDER_NAME,
+            JSON.stringify({
+                accessToken,
+                userId: user.id,
+                email: user.email,
+            }),
+        );
 
         await configManager.updateProvider(this.PROVIDER_NAME, {});
     }
@@ -284,11 +279,20 @@ export class EnkryptifyAuth implements AuthProvider {
     }
 
     async getCredentials(): Promise<Credentials> {
-        const authData = await keyring.get(this.PROVIDER_NAME);
-        if (!authData || !authData.accessToken) {
+        const authDataString = await keyring.get(this.PROVIDER_NAME);
+        if (!authDataString) {
             throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
         }
 
-        return { accessToken: authData.accessToken };
+        try {
+            const authData = JSON.parse(authDataString) as StoredAuthData;
+            if (!authData || !authData.accessToken) {
+                throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
+            }
+            return { accessToken: authData.accessToken };
+        } catch (error: unknown) {
+            console.warn(error instanceof Error ? error.message : String(error));
+            throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
+        }
     }
 }

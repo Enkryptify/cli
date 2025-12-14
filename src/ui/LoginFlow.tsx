@@ -1,87 +1,82 @@
-import { Box, Text, useStdout } from "ink";
-import BigText from "ink-big-text";
-import Spinner from "ink-spinner";
-import { useEffect, useState } from "react";
+import type { LoginOptions } from "@/providers/base/AuthProvider";
+import type { Provider } from "@/providers/base/Provider";
+import { Box, Text, render } from "ink";
+import { AwsLogin } from "./AwsLogin";
+import { EnkryptifyLogin } from "./EnkryptifyLogin";
 
 export interface LoginFlowProps {
-    providerName: string;
-    runLogin: () => Promise<void>;
+    provider: Provider;
+    options?: LoginOptions;
+    onError?: (error: Error) => void;
+    onComplete?: () => void;
 }
 
-export function LoginFlow({ providerName, runLogin }: LoginFlowProps) {
-    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-    const [message, setMessage] = useState<string>("");
-
-    const { stdout } = useStdout();
-    const columns = stdout?.columns ?? 80;
-
-    const primaryBlue = "#60a5fa";
-    const primaryBlueDark = "#2563eb";
-
-    useEffect(() => {
-        const performLogin = async () => {
-            try {
-                setMessage(`Authenticating with ${providerName}...`);
-                await runLogin();
-                setStatus("success");
-                setMessage(`✓ Successfully authenticated with ${providerName}`);
-            } catch (error) {
-                const err = error instanceof Error ? error : new Error(String(error));
-                setStatus("error");
-                setMessage(`✗ Error: ${err.message}`);
-            }
-        };
-
-        void performLogin();
-    }, [providerName, runLogin]);
+function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlowProps) {
+    const renderProviderComponent = () => {
+        switch (provider.name) {
+            case "enkryptify":
+                return (
+                    <EnkryptifyLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />
+                );
+            case "aws":
+                return <AwsLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />;
+            default:
+                return (
+                    <Box>
+                        <Text>Unknown provider: {provider.name}</Text>
+                    </Box>
+                );
+        }
+    };
 
     return (
         <Box flexDirection="column" padding={1}>
-            <Box flexDirection="column" marginBottom={2}>
-                <BigText text="WELCOME TO" colors={[primaryBlue, primaryBlueDark]} />
-                <BigText text="ENKRYPTIFY" colors={[primaryBlue, primaryBlueDark]} />
-            </Box>
-
-            <Box width={columns} justifyContent="center">
-                <Box flexDirection="column" alignItems="center">
-                    {status === "loading" && (
-                        <Box flexDirection="column" alignItems="center">
-                            <Box>
-                                <Text color={primaryBlueDark}>
-                                    <Spinner type="dots" />
-                                </Text>
-                            </Box>
-                            <Text bold color={primaryBlueDark}>
-                                {message}
-                            </Text>
-                        </Box>
-                    )}
-
-                    {status === "success" && (
-                        <Box marginTop={1} alignItems="center" paddingX={2}>
-                            <Text bold color={primaryBlueDark}>
-                                {message}
-                            </Text>
-                        </Box>
-                    )}
-
-                    {status === "error" && (
-                        <Box marginTop={1} alignItems="center" paddingX={2}>
-                            <Text bold color={primaryBlueDark}>
-                                {message}
-                            </Text>
-                        </Box>
-                    )}
-                </Box>
-            </Box>
-
-            {status === "loading" && (
-                <Box width={columns} justifyContent="center" marginTop={1}>
-                    <Text bold color={primaryBlue}>
-                        Please complete authentication in your browser...
-                    </Text>
-                </Box>
-            )}
+            {renderProviderComponent()}
         </Box>
     );
+}
+
+export async function LoginFlow({ provider, options, onError }: LoginFlowProps): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let isResolved = false;
+
+        const login = render(
+            <LoginFlowComponent
+                provider={provider}
+                options={options}
+                onError={(error) => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    onError?.(error);
+                    process.nextTick(() => {
+                        login.unmount();
+                        reject(error);
+                    });
+                }}
+                onComplete={() => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    process.nextTick(() => {
+                        login.unmount();
+                        resolve();
+                    });
+                }}
+            />,
+        );
+
+        login
+            .waitUntilExit()
+            .then(() => {
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve();
+                }
+            })
+            .catch((error) => {
+                if (!isResolved) {
+                    isResolved = true;
+                    reject(error);
+                }
+            });
+    });
 }
