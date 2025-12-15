@@ -18,10 +18,10 @@ export function AwsLogin({ provider, options, onError, onComplete }: AwsLoginPro
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage(`Authenticating with aws...`);
+                setMessage(`Authenticating with AWS...`);
                 await provider.login(options);
                 setStatus("success");
-                setMessage(`✓ Successfully authenticated with aws`);
+                setMessage(`✓ Successfully authenticated with AWS`);
                 process.nextTick(() => {
                     onComplete?.();
                 });
@@ -65,7 +65,9 @@ export function AwsLogin({ provider, options, onError, onComplete }: AwsLoginPro
 
             {status === "loading" && (
                 <Box marginTop={1}>
-                    <Text>Please complete authentication in your browser...</Text>
+                    <Text>
+                        Using your local AWS CLI credentials (profile, SSO, or access keys) to verify your identity...
+                    </Text>
                 </Box>
             )}
         </>

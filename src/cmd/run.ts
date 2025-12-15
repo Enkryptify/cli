@@ -44,7 +44,7 @@ export async function runCommand(
 export function registerRunCommand(program: Command) {
     program
         .command("run")
-        .description("Load secrets as environment variables")
+        .description("Run a command with secrets from the provider injected as environment variables.")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
         .argument(
             "<cmd...>",

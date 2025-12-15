@@ -22,8 +22,8 @@ program.configureOutput({
 });
 
 program
-    .name("ek")
-    .description("CLI for Enkryptify")
+    .name("kk")
+    .description("Enkryptify CLI")
     .version(env.CLI_VERSION ?? "0.0.0", "-v, --version");
 
 registerCommands(program);

@@ -24,8 +24,8 @@ export async function ListSecretsCommand(mode: "show" | "hide"): Promise<void> {
 export function registerListCommand(program: Command) {
     program
         .command("list")
-        .description("Show the secrets in the current environment")
-        .option("-s, --show", "Show the table with the secrets values ")
+        .description("The list command is used to show the secrets in the current environment.")
+        .option("-s, --show", "Show the table with the secrets values (default: masked)")
         .action(async (opts: { show?: boolean }) => {
             try {
                 const mode: "show" | "hide" = opts.show ? "show" : "hide";

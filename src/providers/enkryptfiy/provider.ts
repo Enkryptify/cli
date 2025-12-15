@@ -265,7 +265,7 @@ export class EnkryptifyProvider implements Provider {
 
         const existingPersonalValue = existingSecret.values.find(
             (v) => v.environmentId === environment_id && v.isPersonal === true,
-            );
+        );
         const existingNonPersonalValue = existingSecret.values.find(
             (v) => v.environmentId === environment_id && v.isPersonal === false,
         );

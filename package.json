@@ -46,7 +46,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.950.0",
     "@aws-sdk/client-sso-oidc": "^3.946.0",
+    "@aws-sdk/client-sts": "^3.948.0",
     "@aws-sdk/credential-provider-sso": "^3.946.0",
     "@t3-oss/env-core": "^0.13.8",
     "axios": "^1.13.2",

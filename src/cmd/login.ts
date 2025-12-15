@@ -6,7 +6,7 @@ import type { Command } from "commander";
 export function registerLoginCommand(program: Command) {
     program
         .command("login")
-        .description("Authenticate with provider")
+        .description("The login command is used to authenticate with a provider.")
         .option("-p, --provider <providerName>", "Provider name (defaults to 'enkryptify' if available)")
         .option("-f, --force", "Force re-authentication even if already logged in")
         .action(async (options: { provider?: string; force?: boolean }) => {

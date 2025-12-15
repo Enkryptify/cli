@@ -25,7 +25,7 @@ export async function deleteSecretCommand(name: string): Promise<void> {
 export function registerDeleteCommand(program: Command) {
     program
         .command("delete")
-        .description("Delete a secret from the current environment")
+        .description("The delete command is used to delete a secret from the current environment.")
         .argument("<name>", "Secret name (key) to delete. Example: ek delete MySecret")
         .action(async (name: string) => {
             try {

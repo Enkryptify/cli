@@ -2,11 +2,11 @@ import type { ProjectConfig } from "@/lib/config";
 import type { LoginOptions } from "@/providers/base/AuthProvider";
 
 export type Secret = {
-    id: string;
+    id?: string;
     name: string;
     value: string;
-    isPersonal: boolean;
-    environmentId: string;
+    isPersonal?: boolean;
+    environmentId?: string;
 };
 
 export type runOptions = {

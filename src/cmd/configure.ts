@@ -43,7 +43,7 @@ export function registerConfigureCommand(program: Command) {
     program
         .command("configure")
         .alias("setup")
-        .description("Set up project with a secrets provider")
+        .description("The configure command is used to set up a project with a secrets provider.")
         .option("--provider <provider>", "Provider name (defaults to 'enkryptify' if available)")
         .action(async (options: { provider?: string }) => {
             try {

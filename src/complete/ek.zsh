@@ -1,11 +1,9 @@
-#compdef ek
 
-_ek() {
+_ek_complete() {
   local -a suggestions
   suggestions=("${(@f)$(ek __complete ${words[2,-1]})}")
   _describe 'values' suggestions
 }
 
-compdef _ek ek
-
+compdef _ek_complete ek
 

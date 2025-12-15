@@ -1,9 +1,5 @@
 # Enkryptify CLI
 
-A CLI tool to inject secrets from Enkryptify and other providers in a secure way without `.env` files.
-
-## Overview
-
 Enkryptify CLI is a command-line tool that securely manages and injects secrets from various secret management providers (Enkryptify, AWS, etc.) directly into your commands and applications.
 
 **Key Features:**
@@ -677,7 +673,7 @@ Run a command with secrets injected as environment variables.
 
 **Options:**
 
-- `--env, -e <name>` - Environment name to use (overrides default from config)
+- `--env, -e <name>` - Environment name to use (overrides default from config) for this run only.
 
 **Note:** The `--` separator is **optional**. You can run commands directly without it. Only use `--` if you have flags that might conflict with the CLI's options.
 
@@ -687,7 +683,7 @@ Run a command with secrets injected as environment variables.
 ek run npm start
 ek run python app.py
 ek run --env production --  npm run deploy
-ek run -- pnpm run dev  # -- is optional, only needed for complex commands
+ek run -- pnpm run dev  # -- is optional
 ```
 
 ### `ek list [--show]`
@@ -712,7 +708,7 @@ Create a new secret in the current environment.
 **Arguments:**
 
 - `<name>` - Secret name (required) - can only contain A-Z, a-z, 0-9, underscore (\_), and hyphen (-)
-- `[value]` - Secret value (optional, will prompt if not provided)
+- `[value]` - Secret value (optional, will prompt if not provided) use "" for complex values
 
 **Examples:**
 
