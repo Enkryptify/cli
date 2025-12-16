@@ -68,7 +68,7 @@ async function getSecureNoteByTitle(client: Client, vaultId: string, title: stri
         return full;
     } catch (error: unknown) {
         if (error instanceof Error && error.message.includes("Secure Note")) {
-            throw error; // Re-throw our custom errors as-is
+            throw error;
         }
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to fetch Secure Note "${title}": ${message}`);
@@ -162,7 +162,6 @@ export class OnePasswordProvider implements Provider {
                         });
                     }
                 } catch (error: unknown) {
-                    // Log but continue processing other notes
                     const message = error instanceof Error ? error.message : String(error);
                     console.warn(`Failed to fetch note "${note.title}": ${message}`);
                 }
