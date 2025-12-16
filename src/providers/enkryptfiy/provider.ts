@@ -166,9 +166,7 @@ export class EnkryptifyProvider implements Provider {
             path: options,
             provider: provider,
             workspace_slug: workspaceSlug,
-            workspace_name: selectedWorkspace.name,
             project_slug: projectSlug,
-            project_name: selectedProject.name,
             environment_id: environmentId,
         };
 

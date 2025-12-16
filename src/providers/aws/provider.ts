@@ -10,7 +10,7 @@ import {
     SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 import type { LoginOptions } from "../base/AuthProvider";
-import type { Provider, ProviderConfig, Secret, runOptions } from "../base/Provider";
+import type { Provider, Secret, runOptions } from "../base/Provider";
 
 export class AwsProvider implements Provider {
     readonly name = "aws";
@@ -76,7 +76,7 @@ export class AwsProvider implements Provider {
             };
         }
     }
-    async run(config: ProviderConfig, options?: runOptions): Promise<Secret[]> {
+    async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
         const prefix = config.prefix ?? options?.env;
 
         if (!prefix) {

@@ -26,7 +26,7 @@ export interface Provider {
 
     configure(options: string): Promise<ProjectConfig>;
 
-    run(config: ProviderConfig, options?: runOptions): Promise<Secret[]>;
+    run(config: ProjectConfig, options?: runOptions): Promise<Secret[]>;
 
     createSecret(config: ProjectConfig, name: string, value: string): Promise<void>;
 

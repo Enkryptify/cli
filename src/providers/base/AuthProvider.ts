@@ -5,6 +5,7 @@ export interface Credentials {
 export type LoginOptions = {
     providerName: string;
     force?: boolean;
+    key?: string;
 };
 
 export interface AuthProvider {
