@@ -4,6 +4,7 @@ import { Box, Text, render } from "ink";
 import { AwsLogin } from "./AwsLogin";
 import { EnkryptifyLogin } from "./EnkryptifyLogin";
 import { GcpLogin } from "./GcpLogin";
+import { OnePasswordLogin } from "./onePassword";
 
 export interface LoginFlowProps {
     provider: Provider;
@@ -24,6 +25,10 @@ function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlo
             case "gcp":
                 return <GcpLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />;
 
+            case "onePassword":
+                return (
+                    <OnePasswordLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />
+                );
             default:
                 return (
                     <Box>
