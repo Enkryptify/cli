@@ -27,7 +27,7 @@ export function registerUpdateCommand(program: Command) {
         .command("update")
         .description("Update a secret in the current environment")
         .argument("<name>", "Secret name (key) to update. Example: ek update MySecret")
-        .option("--ispersonal", "Make the secret personal ")
+        .option("--ispersonal", "Make the secret personal this flag is only available for enkryptify provider")
         .action(async (name: string, opts?: { ispersonal?: boolean }) => {
             try {
                 await updateSecretCommand(name, opts?.ispersonal);

@@ -27,5 +27,9 @@ export async function getTextInput(prompt: string): Promise<string> {
         message: prompt,
     });
 
-    return (response.value as string) || "";
+    if (response.value === undefined) {
+        throw new Error("Input cancelled");
+    }
+
+    return response.value as string;
 }

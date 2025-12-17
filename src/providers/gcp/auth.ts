@@ -8,7 +8,7 @@ export class GcpAuth implements AuthProvider {
 
     constructor() {
         this.gcpClient = new GoogleAuth({
-            scopes: [process.env.GCP_SCOPES ?? ""],
+            scopes: process.env.GCP_SCOPES?.split(",") ?? ["https://www.googleapis.com/auth/cloud-platform"],
         });
     }
 

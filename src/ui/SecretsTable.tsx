@@ -64,8 +64,5 @@ export function showSecretsTable(secrets: Secret[]): void {
         return;
     }
 
-    const table = render(<SecretsList secrets={secrets} />);
-    process.nextTick(() => {
-        table.unmount();
-    });
+    render(<SecretsList secrets={secrets} />);
 }

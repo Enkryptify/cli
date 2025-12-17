@@ -6,15 +6,13 @@ export class AwsAuth implements AuthProvider {
     private readonly PROVIDER_NAME = "aws";
     private readonly awsClient = new STSClient({});
 
-    async login(options?: LoginOptions): Promise<void> {
-        console.log("Logging in to AWS...", options);
+    async login(_options?: LoginOptions): Promise<void> {
         try {
             const result = await this.awsClient.send(new GetCallerIdentityCommand({}));
 
             console.log("✅ AWS authentication successful");
             console.log("Account:", result.Account);
             console.log("ARN:", result.Arn);
-            console.log("data", result);
             await config.updateProvider(this.PROVIDER_NAME, {});
         } catch (err: unknown) {
             console.error("❌ AWS authentication failed", err instanceof Error ? err.message : String(err));

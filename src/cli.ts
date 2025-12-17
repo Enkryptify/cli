@@ -37,7 +37,12 @@ if (isCompletion) {
 
 setupTerminalCleanup();
 
-program.parseAsync(process.argv).catch((error) => {
-    logError(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-});
+program
+    .parseAsync(process.argv)
+    .then(() => {
+        process.exit(0);
+    })
+    .catch((error) => {
+        logError(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+    });

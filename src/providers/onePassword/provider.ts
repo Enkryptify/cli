@@ -273,13 +273,33 @@ export class OnePasswordProvider implements Provider {
             const vaultId = ensureVaultId(config);
             const client = await this.getClient();
 
-            const notes = await getSecureNotes(client, vaultId);
-            const note = notes.find((n) => n.title === name);
+            const keyName = await getTextInput("Enter key to delete (or press Enter to delete entire note): ");
 
-            if (!note) throw new Error(`Secure Note "${name}" not found.`);
+            if (!keyName.trim()) {
+                const notes = await getSecureNotes(client, vaultId);
+                const note = notes.find((n) => n.title === name);
+                if (!note) throw new Error(`Secure Note "${name}" not found.`);
 
-            await client.items.delete(vaultId, note.id);
-            showMessage(`Deleted "${name}".`);
+                await client.items.delete(vaultId, note.id);
+                showMessage(`Deleted note "${name}".`);
+            } else {
+                const note = await getSecureNoteByTitle(client, vaultId, name);
+                const entries = parseNotes(note.notes);
+                const filtered = entries.filter((e) => e.key !== keyName.trim());
+
+                if (filtered.length === entries.length) {
+                    throw new Error(`Key "${keyName}" not found in note "${name}".`);
+                }
+
+                const updatedNotes = filtered.map((e) => `${e.key}=${e.value}`).join("\n");
+
+                await client.items.put({
+                    ...note,
+                    notes: updatedNotes,
+                });
+
+                showMessage(`Deleted key "${keyName}" from note "${name}".`);
+            }
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete secret "${name}": ${message}`);

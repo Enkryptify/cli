@@ -1,6 +1,7 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { getSecureInput, getTextInput } from "@/lib/input";
 import { AwsAuth } from "@/providers/aws/auth";
+import { confirm } from "@/ui/Confirm";
 import {
     CreateSecretCommand,
     DeleteSecretCommand,
@@ -202,6 +203,12 @@ export class AwsProvider implements Provider {
 
         try {
             await this.secretsClient.send(
+                new GetSecretValueCommand({
+                    SecretId: fullName,
+                }),
+            );
+
+            await this.secretsClient.send(
                 new DeleteSecretCommand({
                     SecretId: fullName,
                     ForceDeleteWithoutRecovery: true,
@@ -211,8 +218,7 @@ export class AwsProvider implements Provider {
             console.log(`✔ Secret "${name}" deleted successfully from prefix "${prefix}".`);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            console.error(`❌ Failed to delete secret "${name}": ${message}`);
-            throw new Error(`Failed to delete secret "${name}"`, { cause: error });
+            throw new Error(`❌ Failed to delete secret "${name}": ${message}`);
         }
     }
     async listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]> {

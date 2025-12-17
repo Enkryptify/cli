@@ -22,23 +22,22 @@ export async function runCommand(
     const secrets = await provider.run(projectconfig, { env: options?.env });
     const env = buildEnvWithSecrets(secrets);
 
-    if (cmd.length === 0) {
-        throw new Error("Command is required. Please provide a command to run.");
-    }
-
     const [bin, ...args] = cmd;
 
     if (!bin) {
         throw new Error("Command is required. Please provide a command to run.");
     }
-
     const proc = Bun.spawn([bin, ...args], {
         env: env,
         stdout: "inherit",
         stderr: "inherit",
     });
 
-    await proc.exited;
+    const exitCode = await proc.exited;
+
+    if (exitCode !== 0) {
+        process.exit(exitCode);
+    }
 }
 
 export function registerRunCommand(program: Command) {

@@ -2,7 +2,7 @@ import { env } from "@/env";
 import { config as configManager } from "@/lib/config";
 import { keyring } from "@/lib/keyring";
 import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider";
-import http from "@/providers/enkryptfiy/httpClient";
+import http from "@/providers/enkryptify/httpClient";
 import { createHash, randomBytes } from "crypto";
 import open from "open";
 import { URL } from "url";
@@ -193,12 +193,18 @@ export class EnkryptifyAuth implements AuthProvider {
     }
 
     private authErrorResponse(message: string): Response {
+        const escapedMessage = message
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
         return new Response(
             `<html>
           <head><title>Authentication Error</title></head>
           <body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
             <h2 style="color: #E64545;">Authentication Error</h2>
-            <p style="color: #F7F7F7;">${message}</p>
+            <p style="color: #F7F7F7;">${escapedMessage}</p>
             <p style="color: #F7F7F7;">You can close this window and try again.</p>
           </body>
         </html>`,

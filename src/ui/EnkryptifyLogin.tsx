@@ -2,8 +2,7 @@ import type { LoginOptions } from "@/providers/base/AuthProvider";
 import type { Provider } from "@/providers/base/Provider";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
-import { useEffect, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
 export interface EnkryptifyLoginProps {
     provider: Provider;
     options?: LoginOptions;
@@ -14,7 +13,13 @@ export interface EnkryptifyLoginProps {
 export function EnkryptifyLogin({ provider, options, onError, onComplete }: EnkryptifyLoginProps) {
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
     const [message, setMessage] = useState<string>("");
+    const onErrorRef = useRef(onError);
+    const onCompleteRef = useRef(onComplete);
 
+    useEffect(() => {
+        onErrorRef.current = onError;
+        onCompleteRef.current = onComplete;
+    });
     useEffect(() => {
         const performLogin = async () => {
             try {
@@ -23,18 +28,18 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
                 setStatus("success");
                 setMessage(`✓ Successfully authenticated with enkryptify`);
                 setTimeout(() => {
-                    onComplete?.();
+                    onCompleteRef.current?.();
                 }, 1000);
             } catch (error) {
                 const err = error instanceof Error ? error : new Error(String(error));
                 setStatus("error");
                 setMessage(`⚠️  ${err.message}`);
-                onError?.(err);
+                onErrorRef.current?.(err);
             }
         };
 
         void performLogin();
-    }, [provider, options, onError, onComplete]);
+    }, [provider, options]);
 
     return (
         <>

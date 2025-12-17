@@ -10,8 +10,7 @@ function MessageDisplay({ message }: { message: string }) {
 
 export function showMessage(message: string): void {
     const msg = render(<MessageDisplay message={message} />);
-
-    process.nextTick(() => {
+    setTimeout(() => {
         msg.unmount();
-    });
+    }, 2000);
 }
