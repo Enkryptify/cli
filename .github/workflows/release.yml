@@ -2,6 +2,8 @@ name: Release CLI
 
 on:
     push:
+        branches:
+            - release-test
         tags:
             - "v*"
 
@@ -10,6 +12,10 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: write
+
+        env:
+            IS_TAG: ${{ github.ref_type == 'tag' }}
+
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -24,146 +30,204 @@ jobs:
             - name: Install dependencies
               run: bun install --frozen-lockfile
 
+            # ------------------------------------------------------------
+            # Normalize version (GoReleaser parity)
+            # ------------------------------------------------------------
+            - name: Normalize version
+              shell: bash
+              run: |
+                  set -euo pipefail
+
+                  if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+                    VERSION="${GITHUB_REF#refs/tags/v}"
+                    TAG="v${VERSION}"
+                  else
+                    VERSION="0.0.0-dev"
+                    TAG="dev-${GITHUB_SHA::7}"
+                  fi
+
+                  echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+                  echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+            # ------------------------------------------------------------
+            # Build CLI
+            # ------------------------------------------------------------
             - name: Build TypeScript
               run: bun run build
               env:
-                  VERSION: ${{ github.ref_name }}
+                  VERSION: ${{ env.VERSION }}
+                  CLI_VERSION: ${{ env.VERSION }}
                   COMMIT: ${{ github.sha }}
                   BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
             - name: Package binaries
               run: bun run package
 
-            - name: Create archives
+            # ------------------------------------------------------------
+            # Verify outputs (fail fast like GoReleaser)
+            # ------------------------------------------------------------
+            - name: Verify expected binaries exist
+              shell: bash
               run: |
+                  set -euo pipefail
+                  cd bin
+
+                  required=(
+                    "cli-linux"
+                    "cli-linux-arm64"
+                    "cli-macos"
+                    "cli-macos-arm64"
+                    "cli-win.exe"
+                  )
+
+                  for f in "${required[@]}"; do
+                    [[ -f "$f" ]] || { echo "Missing binary: $f"; exit 1; }
+                  done
+
+            # ------------------------------------------------------------
+            # Create archives
+            # ------------------------------------------------------------
+            - name: Create archives
+              shell: bash
+              run: |
+                  set -euo pipefail
+
                   mkdir -p dist/archives
                   cd bin
 
-                  # Linux x64
-                  if [ -f "cli-linux" ]; then
-                    mkdir -p /tmp/linux-x64
-                    cp cli-linux /tmp/linux-x64/ek
-                    chmod +x /tmp/linux-x64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Linux_x86_64.tar.gz" -C /tmp/linux-x64 ek
-                  fi
+                  package_tgz () {
+                    src="$1"; os="$2"; arch="$3"
+                    out="$GITHUB_WORKSPACE/dist/archives/enkryptify_${os}_${arch}.tar.gz"
+                    mkdir -p "/tmp/pkg-${os}-${arch}"
+                    cp "$src" "/tmp/pkg-${os}-${arch}/ek"
+                    chmod +x "/tmp/pkg-${os}-${arch}/ek"
+                    # Include completion scripts and install script for Unix systems
+                    mkdir -p "/tmp/pkg-${os}-${arch}/completions"
+                    cp "$GITHUB_WORKSPACE/src/complete/ek.bash" "/tmp/pkg-${os}-${arch}/completions/ek.bash"
+                    cp "$GITHUB_WORKSPACE/src/complete/ek.zsh" "/tmp/pkg-${os}-${arch}/completions/ek.zsh"
+                    cp "$GITHUB_WORKSPACE/src/complete/install-completions.sh" "/tmp/pkg-${os}-${arch}/install-completions.sh"
+                    chmod +x "/tmp/pkg-${os}-${arch}/install-completions.sh"
+                    tar -czf "$out" -C "/tmp/pkg-${os}-${arch}" ek completions install-completions.sh
+                  }
 
-                  # Linux ARM64
-                  if [ -f "cli-linux-arm64" ]; then
-                    mkdir -p /tmp/linux-arm64
-                    cp cli-linux-arm64 /tmp/linux-arm64/ek
-                    chmod +x /tmp/linux-arm64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Linux_arm64.tar.gz" -C /tmp/linux-arm64 ek
-                  fi
+                  package_zip () {
+                    src="$1"; os="$2"; arch="$3"
+                    out="$GITHUB_WORKSPACE/dist/archives/enkryptify_${os}_${arch}.zip"
+                    mkdir -p "/tmp/pkg-${os}-${arch}"
+                    cp "$src" "/tmp/pkg-${os}-${arch}/ek.exe"
+                    # Include PowerShell completion script for Windows
+                    mkdir -p "/tmp/pkg-${os}-${arch}/completions"
+                    cp "$GITHUB_WORKSPACE/src/complete/ek.ps1" "/tmp/pkg-${os}-${arch}/completions/ek.ps1"
+                    (cd "/tmp/pkg-${os}-${arch}" && zip -r "$out" ek.exe completions)
+                  }
 
-                  # macOS x64
-                  if [ -f "cli-macos" ]; then
-                    mkdir -p /tmp/macos-x64
-                    cp cli-macos /tmp/macos-x64/ek
-                    chmod +x /tmp/macos-x64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Darwin_x86_64.tar.gz" -C /tmp/macos-x64 ek
-                  fi
+                  package_tgz "cli-linux"        "Linux"   "x86_64"
+                  package_tgz "cli-linux-arm64"  "Linux"   "arm64"
+                  package_tgz "cli-macos"        "Darwin"  "x86_64"
+                  package_tgz "cli-macos-arm64"  "Darwin"  "arm64"
+                  package_zip "cli-win.exe"      "Windows" "x86_64"
 
-                  # macOS ARM64
-                  if [ -f "cli-macos-arm64" ]; then
-                    mkdir -p /tmp/macos-arm64
-                    cp cli-macos-arm64 /tmp/macos-arm64/ek
-                    chmod +x /tmp/macos-arm64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Darwin_arm64.tar.gz" -C /tmp/macos-arm64 ek
-                  fi
-
-                  # Windows x64
-                  if [ -f "cli-win.exe" ]; then
-                    mkdir -p /tmp/windows-x64
-                    cp cli-win.exe /tmp/windows-x64/ek.exe
-                    cd /tmp/windows-x64
-                    zip -r "$GITHUB_WORKSPACE/dist/archives/enkryptify_Windows_x86_64.zip" ek.exe
-                  fi
-
-                  cd "$GITHUB_WORKSPACE"
-
+            # ------------------------------------------------------------
+            # Checksums
+            # ------------------------------------------------------------
             - name: Generate checksums
+              shell: bash
               run: |
+                  set -euo pipefail
                   cd dist/archives
                   sha256sum * > checksums.txt
 
+            # ------------------------------------------------------------
+            # Changelog (GoReleaser-style)
+            # ------------------------------------------------------------
             - name: Generate changelog
               id: changelog
+              shell: bash
               run: |
-                  LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-                  if [ -z "$LAST_TAG" ]; then
-                    CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | grep -vE '^(docs|test|ci):|Merge (pull request|branch)' | head -50)
+                  set -euo pipefail
+                  LAST_TAG="$(git describe --tags --abbrev=0 "${GITHUB_SHA}^" 2>/dev/null || true)"
+                  filter='^(docs|test|ci):|Merge (pull request|branch)'
+
+                  if [[ -z "$LAST_TAG" ]]; then
+                    LOG=$(git log --pretty=format:"- %s (%h)" --no-merges | grep -vE "$filter" | head -50 || true)
                   else
-                    CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -vE '^(docs|test|ci):|Merge (pull request|branch)')
+                    LOG=$(git log "$LAST_TAG..HEAD" --pretty=format:"- %s (%h)" --no-merges | grep -vE "$filter" || true)
                   fi
 
                   {
-                    echo 'changelog<<EOF'
-                    echo "$CHANGELOG"
-                    echo EOF
-                  } >> $GITHUB_OUTPUT
+                    echo "changelog<<EOF"
+                    echo "$LOG"
+                    echo "EOF"
+                  } >> "$GITHUB_OUTPUT"
 
+            # ------------------------------------------------------------
+            # GitHub Release (tags only)
+            # ------------------------------------------------------------
             - name: Create GitHub Release
+              if: github.ref_type == 'tag'
               uses: softprops/action-gh-release@v1
               with:
-                  files: |
-                      dist/archives/*
-                  name: Release ${{ github.ref_name }}
+                  files: dist/archives/*
+                  name: Release ${{ env.TAG }}
+                  prerelease: ${{ contains(github.ref_name, '-') }}
                   body: |
                       ## What's Changed
-
                       ${{ steps.changelog.outputs.changelog }}
 
                       ## Installation
-
-                      ### macOS (Homebrew)
-                      ```bash
+                      ### macOS
                       brew install enkryptify/enkryptify/enkryptify
-                      ```
 
-                      ### Windows (Scoop)
-                      ```powershell
+                      ### Windows
                       scoop bucket add enkryptify https://github.com/enkryptify/scoop-enkryptify.git
                       scoop install enkryptify
-                      ```
 
                       ### Linux
-                      Download the appropriate `.tar.gz` file and extract:
-                      ```bash
                       tar -xzf enkryptify_Linux_x86_64.tar.gz
                       sudo mv ek /usr/local/bin/
-                      ```
 
-                      ## Checksums
-                      See `checksums.txt` for SHA256 checksums of all binaries.
-                  draft: false
-                  prerelease: ${{ contains(github.ref_name, '-') }}
+                      # Setup autocomplete (automatic)
+                      ./install-completions.sh
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+            # ------------------------------------------------------------
+            # Homebrew (test repo on branch, prod repo on tag)
+            # ------------------------------------------------------------
             - name: Update Homebrew Formula
-              if: startsWith(github.ref, 'refs/tags/v')
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
-                  SHA256=$(sha256sum dist/archives/enkryptify_Darwin_x86_64.tar.gz | cut -d' ' -f1)
-                  URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/enkryptify_Darwin_x86_64.tar.gz"
+                  set -euo pipefail
 
-                  git clone https://github.com/enkryptify/homebrew-enkryptify.git /tmp/homebrew-tap
-                  cd /tmp/homebrew-tap
+                  BREW_REPO="homebrew-enkryptify-test"
+                  if [[ "$IS_TAG" == "true" ]]; then
+                    BREW_REPO="homebrew-enkryptify"
+                  fi
+
+                  ARCHIVE="enkryptify_Darwin_x86_64.tar.gz"
+                  SHA256=$(sha256sum "dist/archives/$ARCHIVE" | cut -d' ' -f1)
+                  URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${ARCHIVE}"
+
+                  git clone "https://github.com/enkryptify/${BREW_REPO}.git" /tmp/brew
+                  cd /tmp/brew
+                  mkdir -p Formula
 
                   cat > Formula/enkryptify.rb << EOF
                   class Enkryptify < Formula
-                    desc "Official Enkryptify CLI for injecting secrets into your codebase"
+                    desc "Official Enkryptify CLI"
                     homepage "https://enkryptify.com"
-                    url "${URL}"
-                    sha256 "${SHA256}"
-                    version "${VERSION}"
-                    
+                    url "$URL"
+                    sha256 "$SHA256"
+                    version "$VERSION"
+
                     def install
                       bin.install "ek"
-                    end
-                    
-                    test do
-                      system "#{bin}/ek --version"
+                      # Install bash completion
+                      bash_completion.install "completions/ek.bash" => "ek"
+                      # Install zsh completion
+                      zsh_completion.install "completions/ek.zsh" => "_ek"
                     end
                   end
                   EOF
@@ -171,51 +235,47 @@ jobs:
                   git config user.name "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
                   git add Formula/enkryptify.rb
-                  git commit -m "Brew formula update for enkryptify version v${VERSION}" || exit 0
-                  git push https://${{ secrets.GH_TOKEN }}@github.com/enkryptify/homebrew-enkryptify.git
+                  git commit -m "Brew update v$VERSION" || exit 0
+                  git push "https://${GH_TOKEN}@github.com/enkryptify/${BREW_REPO}.git"
+
+            # ------------------------------------------------------------
+            # Scoop (test repo on branch, prod repo on tag)
+            # ------------------------------------------------------------
+            - name: Update Scoop Manifest
+              shell: bash
               env:
                   GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-            - name: Update Scoop Manifest
-              if: startsWith(github.ref, 'refs/tags/v')
               run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
-                  SHA256=$(sha256sum dist/archives/enkryptify_Windows_x86_64.zip | cut -d' ' -f1)
-                  URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/enkryptify_Windows_x86_64.zip"
+                  set -euo pipefail
 
-                  git clone https://github.com/enkryptify/scoop-enkryptify.git /tmp/scoop-bucket
-                  cd /tmp/scoop-bucket
+                  SCOOP_REPO="scoop-enkryptify-test"
+                  if [[ "$IS_TAG" == "true" ]]; then
+                    SCOOP_REPO="scoop-enkryptify"
+                  fi
+
+                  ARCHIVE="enkryptify_Windows_x86_64.zip"
+                  SHA256=$(sha256sum "dist/archives/$ARCHIVE" | cut -d' ' -f1)
+                  URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/${ARCHIVE}"
+
+                  git clone "https://github.com/Enkryptify/${SCOOP_REPO}.git" /tmp/scoop
+                  cd /tmp/scoop
 
                   cat > enkryptify.json << EOF
                   {
-                    "version": "${VERSION}",
-                    "description": "Official Enkryptify CLI for injecting secrets into your codebase",
-                    "homepage": "https://enkryptify.com",
-                    "license": "GPL-3.0-only",
+                    "version": "$VERSION",
                     "architecture": {
                       "64bit": {
-                        "url": "${URL}",
-                        "hash": "${SHA256}"
+                        "url": "$URL",
+                        "hash": "$SHA256"
                       }
                     },
                     "bin": "ek.exe",
-                    "checkver": {
-                      "github": "${{ github.repository }}"
-                    },
-                    "autoupdate": {
-                      "architecture": {
-                        "64bit": {
-                          "url": "https://github.com/${{ github.repository }}/releases/download/v\$version/enkryptify_Windows_x86_64.zip"
-                        }
-                      }
-                    }
+                    "post_install": "if (Test-Path \"$dir\\completions\\ek.ps1\") { if (-not (Test-Path (Split-Path \$PROFILE))) { New-Item -ItemType Directory -Path (Split-Path \$PROFILE) -Force | Out-Null }; if (-not (Select-String -Path \$PROFILE -Pattern 'ek.ps1' -Quiet)) { Add-Content -Path \$PROFILE -Value \". \\\"\$dir\\completions\\ek.ps1\\\"\" } }"
                   }
                   EOF
 
                   git config user.name "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
                   git add enkryptify.json
-                  git commit -m "Scoop update for enkryptify version v${VERSION}" || exit 0
-                  git push https://${{ secrets.GH_TOKEN }}@github.com/Enkryptify/scoop-enkryptify.git
-              env:
-                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+                  git commit -m "Scoop update v$VERSION" || exit 0
+                  git push "https://${GH_TOKEN}@github.com/Enkryptify/${SCOOP_REPO}.git"
