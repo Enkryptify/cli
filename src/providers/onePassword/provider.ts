@@ -28,11 +28,14 @@ function parseEnvLine(line: string): ParsedNote | null {
     }
 }
 
-function ensureVaultId(config: ProjectConfig): string {
+function ensureVaultAndNote(config: ProjectConfig): { vaultId: string; noteId: string } {
     if (!config.vaultId) {
         throw new Error("Vault ID is not set. Run setup first.");
     }
-    return config.vaultId;
+    if (!config.noteId) {
+        throw new Error("Note ID is not set. Run setup first.");
+    }
+    return { vaultId: config.vaultId, noteId: config.noteId };
 }
 
 function parseNotes(notes: string): ParsedNote[] {
@@ -51,27 +54,6 @@ async function getSecureNotes(client: Client, vaultId: string) {
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Failed to fetch Secure Notes from vault: ${message}`);
-    }
-}
-
-async function getSecureNoteByTitle(client: Client, vaultId: string, title: string) {
-    try {
-        const notes = await getSecureNotes(client, vaultId);
-        const overview = notes.find((n) => n.title === title);
-        if (!overview) throw new Error(`Secure Note "${title}" not found.`);
-
-        const full = await client.items.get(vaultId, overview.id);
-        if (!full.notes?.trim()) {
-            throw new Error(`Secure Note "${title}" has no content.`);
-        }
-
-        return full;
-    } catch (error: unknown) {
-        if (error instanceof Error && error.message.includes("Secure Note")) {
-            throw error;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to fetch Secure Note "${title}": ${message}`);
     }
 }
 
@@ -127,14 +109,26 @@ export class OnePasswordProvider implements Provider {
 
             if (!vault) throw new Error("Vault selection failed.");
 
+            const notes = await getSecureNotes(client, vault.id);
+
+            if (!notes.length) throw new Error(`No Secure Notes found in vault "${vault.title}".`);
+
+            const noteLabels = notes.map((n) => n.title || "Untitled");
+            const selectedNote = await selectName(noteLabels, "Select Secure Note");
+
+            const note = notes.find((n) => n.title === selectedNote);
+            if (!note) throw new Error("Secure Note selection failed.");
+
             const projectConfig: ProjectConfig = {
                 path,
                 provider: this.name,
                 vaultId: vault.id,
                 vaultTitle: vault.title,
+                noteName: note.title,
+                noteId: note.id,
             };
 
-            showMessage(`Vault selected: ${vault.title}`);
+            showMessage(`Vault selected: ${vault.title}, Note selected: ${note.title}`);
             return projectConfig;
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
@@ -142,29 +136,36 @@ export class OnePasswordProvider implements Provider {
         }
     }
 
-    async run(config: ProjectConfig, _?: runOptions): Promise<Secret[]> {
+    async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
         try {
-            const vaultId = ensureVaultId(config);
+            const { vaultId, noteId: defaultNoteId } = ensureVaultAndNote(config);
             const client = await this.getClient();
 
-            const notes = await getSecureNotes(client, vaultId);
-            const secrets: Secret[] = [];
+            let targetNoteId = defaultNoteId;
 
-            for (const note of notes) {
-                try {
-                    const full = await client.items.get(vaultId, note.id);
-                    if (!full.notes) continue;
-
-                    for (const entry of parseNotes(full.notes)) {
-                        secrets.push({
-                            name: entry.key,
-                            value: entry.value,
-                        });
-                    }
-                } catch (error: unknown) {
-                    const message = error instanceof Error ? error.message : String(error);
-                    console.warn(`Failed to fetch note "${note.title}": ${message}`);
+            if (options?.env) {
+                const notes = await getSecureNotes(client, vaultId);
+                const targetNote = notes.find((n) => n.title === options.env);
+                if (!targetNote) {
+                    const availableNotes = notes.map((n) => n.title).join(", ");
+                    throw new Error(
+                        `Secure Note "${options.env}" not found. Available notes: ${availableNotes || "none"}`,
+                    );
                 }
+                targetNoteId = targetNote.id;
+            }
+
+            const note = await client.items.get(vaultId, targetNoteId);
+            if (!note.notes) {
+                return [];
+            }
+
+            const secrets: Secret[] = [];
+            for (const entry of parseNotes(note.notes)) {
+                secrets.push({
+                    name: entry.key,
+                    value: entry.value,
+                });
             }
 
             return secrets;
@@ -174,74 +175,64 @@ export class OnePasswordProvider implements Provider {
         }
     }
 
-    async createSecret(config: ProjectConfig, noteName: string, value: string): Promise<void> {
+    async createSecret(config: ProjectConfig, keyName: string, value: string): Promise<void> {
         try {
             if (!value || value.trim().length === 0) {
                 throw new Error("Secret value cannot be empty.");
             }
 
-            const vaultId = ensureVaultId(config);
+            if (!keyName || !keyName.trim()) {
+                throw new Error("Secret key name is required. Example: ek create <keyName>");
+            }
+
+            const { vaultId, noteId } = ensureVaultAndNote(config);
             const client = await this.getClient();
 
-            const parentName = noteName?.trim();
-            if (!parentName) {
-                throw new Error("Secure Note name is required. Example: ek create <noteName>");
+            const note = await client.items.get(vaultId, noteId);
+            const currentNotes = note.notes?.trim() ?? "";
+
+            if (currentNotes) {
+                const entries = parseNotes(currentNotes);
+                const existingKey = entries.find((e) => e.key === keyName.trim());
+                if (existingKey) {
+                    throw new Error(`Key "${keyName}" already exists in note "${note.title}". Use update instead.`);
+                }
             }
 
-            const keyName = (await getTextInput("Enter secret key name: "))?.trim();
-            if (!keyName) {
-                throw new Error("Secret key name is required.");
-            }
-
-            const notes = await getSecureNotes(client, vaultId);
-            const existing = notes.find((n) => n.title === parentName);
-
-            if (!existing) {
-                await client.items.create({
-                    category: ItemCategory.SecureNote,
-                    vaultId,
-                    title: parentName,
-                    notes: `${keyName}=${value}`,
-                });
-
-                showMessage(`Secret created! Note: "${parentName}", Key: "${keyName}"`);
-                return;
-            }
-
-            const full = await client.items.get(vaultId, existing.id);
-            const currentNotes = full.notes?.trim() ?? "";
-
-            const updatedNotes = currentNotes ? `${currentNotes}\n${keyName}=${value}` : `${keyName}=${value}`;
+            const updatedNotes = currentNotes
+                ? `${currentNotes}\n${keyName.trim()}=${value}`
+                : `${keyName.trim()}=${value}`;
 
             await client.items.put({
-                ...full,
+                ...note,
                 notes: updatedNotes,
             });
 
-            showMessage(`Secret added! Note: "${parentName}", Key: "${keyName}"`);
+            showMessage(`Secret added! Note: "${note.title}", Key: "${keyName}"`);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             throw new Error(`Failed to create secret in 1Password: ${message}`);
         }
     }
 
-    async updateSecret(config: ProjectConfig, noteName: string): Promise<void> {
+    async updateSecret(config: ProjectConfig, keyName: string): Promise<void> {
         try {
-            const vaultId = ensureVaultId(config);
+            if (!keyName || !keyName.trim()) {
+                throw new Error("Key name is required. Please provide a key name.");
+            }
+
+            const { vaultId, noteId } = ensureVaultAndNote(config);
             const client = await this.getClient();
 
-            const note = await getSecureNoteByTitle(client, vaultId, noteName);
-
-            const renamedNote =
-                (await getTextInput(`Rename Secure Note? (current: "${note.title}", Enter to keep): `))?.trim() ||
-                note.title;
+            const note = await client.items.get(vaultId, noteId);
+            if (!note.notes) {
+                throw new Error("Note has no content.");
+            }
 
             const entries = parseNotes(note.notes);
             if (!entries.length) throw new Error("No secrets found.");
 
-            const selectedKey = (await getTextInput("Enter key to update: "))?.trim();
-            if (!selectedKey) throw new Error("Key required.");
-
+            const selectedKey = keyName.trim();
             const entry = entries.find((e) => e.key === selectedKey);
             if (!entry) throw new Error(`Key "${selectedKey}" not found.`);
 
@@ -257,74 +248,68 @@ export class OnePasswordProvider implements Provider {
 
             await client.items.put({
                 ...note,
-                title: renamedNote,
                 notes: updatedNotes,
             });
 
-            showMessage(`Updated "${renamedKey}" in "${renamedNote}".`);
+            showMessage(`Updated "${renamedKey}" in "${note.title}".`);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to update secret in 1Password: ${message}`);
         }
     }
 
-    async deleteSecret(config: ProjectConfig, name: string): Promise<void> {
+    async deleteSecret(config: ProjectConfig, keyName: string): Promise<void> {
         try {
-            const vaultId = ensureVaultId(config);
+            if (!keyName || !keyName.trim()) {
+                throw new Error("Key name is required. Please provide a key name.");
+            }
+
+            const { vaultId, noteId } = ensureVaultAndNote(config);
             const client = await this.getClient();
 
-            const keyName = await getTextInput("Enter key to delete (or press Enter to delete entire note): ");
-
-            if (!keyName.trim()) {
-                const notes = await getSecureNotes(client, vaultId);
-                const note = notes.find((n) => n.title === name);
-                if (!note) throw new Error(`Secure Note "${name}" not found.`);
-
-                await client.items.delete(vaultId, note.id);
-                showMessage(`Deleted note "${name}".`);
-            } else {
-                const note = await getSecureNoteByTitle(client, vaultId, name);
-                const entries = parseNotes(note.notes);
-                const filtered = entries.filter((e) => e.key !== keyName.trim());
-
-                if (filtered.length === entries.length) {
-                    throw new Error(`Key "${keyName}" not found in note "${name}".`);
-                }
-
-                const updatedNotes = filtered.map((e) => `${e.key}=${e.value}`).join("\n");
-
-                await client.items.put({
-                    ...note,
-                    notes: updatedNotes,
-                });
-
-                showMessage(`Deleted key "${keyName}" from note "${name}".`);
+            const note = await client.items.get(vaultId, noteId);
+            if (!note.notes) {
+                throw new Error("Note has no content.");
             }
+
+            const entries = parseNotes(note.notes);
+            const filtered = entries.filter((e) => e.key !== keyName.trim());
+
+            if (filtered.length === entries.length) {
+                throw new Error(`Key "${keyName}" not found in note "${note.title}".`);
+            }
+
+            const updatedNotes = filtered.map((e) => `${e.key}=${e.value}`).join("\n");
+
+            await client.items.put({
+                ...note,
+                notes: updatedNotes,
+            });
+
+            showMessage(`Deleted key "${keyName}" from note "${note.title}".`);
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
-            throw new Error(`Failed to delete secret "${name}": ${message}`);
+            throw new Error(`Failed to delete secret "${keyName}": ${message}`);
         }
     }
 
     async listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]> {
         try {
-            const vaultId = ensureVaultId(config);
+            const { vaultId, noteId } = ensureVaultAndNote(config);
             const client = await this.getClient();
             const reveal = showValues === "show";
 
-            const notes = await getSecureNotes(client, vaultId);
+            const full = await client.items.get(vaultId, noteId);
+            if (!full.notes) {
+                return [];
+            }
+
             const secrets: Secret[] = [];
-
-            for (const note of notes) {
-                const full = await client.items.get(vaultId, note.id);
-                if (!full.notes) continue;
-
-                for (const { key, value } of parseNotes(full.notes)) {
-                    secrets.push({
-                        name: key,
-                        value: reveal ? value : "********",
-                    });
-                }
+            for (const { key, value } of parseNotes(full.notes)) {
+                secrets.push({
+                    name: key,
+                    value: reveal ? value : "********",
+                });
             }
 
             return secrets;
