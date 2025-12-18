@@ -1,3 +1,4 @@
+import { env } from "@/env";
 import { type ProjectConfig, config } from "@/lib/config";
 import { getSecureInput } from "@/lib/input";
 import { confirm } from "@/ui/Confirm";
@@ -9,8 +10,7 @@ import { GcpAuth } from "./auth";
 import httpClient from "./httpClient";
 
 export class GcpProvider implements Provider {
-    private readonly RESOURCE_MANAGER_API =
-        process.env.GCP_RESOURCE_MANAGER_API || "https://cloudresourcemanager.googleapis.com/v1";
+    private readonly RESOURCE_MANAGER_API = env.GCP_RESOURCE_MANAGER_API;
 
     readonly name = "gcp";
     private auth: GcpAuth;
