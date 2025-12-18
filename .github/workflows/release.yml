@@ -1,13 +1,90 @@
-name: Release CLI
+name: Release CLI (macOS test)
 
 on:
+    workflow_dispatch:
+        inputs:
+            publish_release:
+                description: "Publish / update the test prerelease (v0.0.0-test)"
+                type: boolean
+                required: false
+                default: true
+
     push:
         branches:
-            - release-test
+            - 1password/integration
+
+concurrency:
+    group: release-test-macos
+    cancel-in-progress: true
 
 jobs:
-    release:
-        runs-on: ubuntu-latest
+    build-and-release-macos:
+        runs-on: macos-latest
+        permissions:
+            contents: write
+
         steps:
-            - name: Dummy step
-              run: echo "Dummy workflow"
+            - name: Checkout (full history for tagging)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+
+            - name: Install deps
+              run: bun install
+
+            - name: Build macOS binaries (x64 + arm64)
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist/bin dist/archives
+
+                  bun build src/cli.ts --compile --compile-autoload-tsconfig --compile-autoload-package-json --target=bun-darwin-x64   --outfile=dist/bin/ek-darwin-x64
+                  bun build src/cli.ts --compile  --compile-autoload-tsconfig --compile-autoload-package-json --target=bun-darwin-arm64 --outfile=dist/bin/ek-darwin-arm64
+
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek-darwin-x64
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek-darwin-arm64
+
+                  (cd dist/archives && shasum -a 256 * > checksums.txt)
+
+            - name: Move tag v0.0.0-test to this commit
+              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  git config user.name  "Enkryptify Bot"
+                  git config user.email "bot@enkryptify.com"
+                  git tag -f v0.0.0-test
+                  git push -f origin v0.0.0-test
+
+            - name: Publish / update GitHub prerelease (v0.0.0-test)
+              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: v0.0.0-test
+                  name: Test Release v0.0.0-test
+                  prerelease: true
+                  overwrite_files: true
+                  files: |
+                      dist/archives/*
+                  body: |
+                      ⚠️ Test prerelease from branch `release-test`
+                      Commit: ${{ github.sha }}
+
+                      ## macOS (Apple Silicon)
+                      tar -xzf enkryptify_Darwin_arm64.tar.gz
+                      chmod +x ek-darwin-arm64
+                      xattr -dr com.apple.quarantine ek-darwin-arm64 || true
+                      API_BASE_URL=... APP_BASE_URL=... CLI_VERSION=0.0.0-test ./ek-darwin-arm64 --help
+
+                      ## macOS (Intel)
+                      tar -xzf enkryptify_Darwin_x86_64.tar.gz
+                      chmod +x ek-darwin-x64
+                      xattr -dr com.apple.quarantine ek-darwin-x64 || true
+                      API_BASE_URL=... APP_BASE_URL=... CLI_VERSION=0.0.0-test ./ek-darwin-x64 --help
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
