@@ -9,7 +9,8 @@ import { GcpAuth } from "./auth";
 import httpClient from "./httpClient";
 
 export class GcpProvider implements Provider {
-    private readonly RESOURCE_MANAGER_API = process.env.GCP_RESOURCE_MANAGER_API;
+    private readonly RESOURCE_MANAGER_API =
+        process.env.GCP_RESOURCE_MANAGER_API || "https://cloudresourcemanager.googleapis.com/v1";
 
     readonly name = "gcp";
     private auth: GcpAuth;
