@@ -14,7 +14,6 @@ export class AwsAuth implements AuthProvider {
             console.log("✅ AWS authentication successful");
             console.log("Account:", result.Account);
             console.log("ARN:", result.Arn);
-            console.log("data", result);
             await config.updateProvider(this.PROVIDER_NAME, {});
         } catch (err: unknown) {
             console.error("❌ AWS authentication failed", err instanceof Error ? err.message : String(err));
