@@ -1,17 +1,30 @@
-name: Release CLI
+name: Release CLI (macOS test)
 
 on:
+    workflow_dispatch:
+        inputs:
+            publish_release:
+                description: "Publish / update the test prerelease (v0.0.0-test)"
+                type: boolean
+                required: false
+                default: true
+
     push:
-        tags:
-            - "v*"
+        branches:
+            - feature/cli-0.2.0
+
+concurrency:
+    group: release-test-macos
+    cancel-in-progress: true
 
 jobs:
-    release:
-        runs-on: ubuntu-latest
+    build-and-release-macos:
+        runs-on: macos-latest
         permissions:
             contents: write
+
         steps:
-            - name: Checkout
+            - name: Checkout (full history for tagging)
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
@@ -21,201 +34,74 @@ jobs:
               with:
                   bun-version: latest
 
-            - name: Install dependencies
-              run: bun install --frozen-lockfile
+            - name: Install deps
+              run: bun install
 
-            - name: Build TypeScript
-              run: bun run build
-              env:
-                  VERSION: ${{ github.ref_name }}
-                  COMMIT: ${{ github.sha }}
-                  BUILD_DATE: ${{ github.event.head_commit.timestamp }}
-
-            - name: Package binaries
-              run: bun run package
-
-            - name: Create archives
+            - name: Build macOS binaries (x64 + arm64)
+              shell: bash
               run: |
-                  mkdir -p dist/archives
-                  cd bin
+                  set -euo pipefail
+                  mkdir -p dist/bin dist/archives
 
-                  # Linux x64
-                  if [ -f "cli-linux" ]; then
-                    mkdir -p /tmp/linux-x64
-                    cp cli-linux /tmp/linux-x64/ek
-                    chmod +x /tmp/linux-x64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Linux_x86_64.tar.gz" -C /tmp/linux-x64 ek
-                  fi
+                  bun build src/cli.ts \
+                    --compile \
+                    --target=bun-darwin-x64 \
+                    --outfile=dist/bin/ek-darwin-x64 \
+                    --define:API_BASE_URL_DEFAULT='"https://api.enkryptify.com"' \
+                    --define:APP_BASE_URL_DEFAULT='"https://app.enkryptify.com"' \
+                    --define:CLI_VERSION_DEFAULT='"0.2.0-alpha.1"' \
+                    --define:GCP_AUTH_URL_DEFAULT='"https://www.googleapis.com/auth/cloud-platform"' \
+                    --define:GCP_AUTH_SCOPES='"https://www.googleapis.com/auth/cloud-platform"'
 
-                  # Linux ARM64
-                  if [ -f "cli-linux-arm64" ]; then
-                    mkdir -p /tmp/linux-arm64
-                    cp cli-linux-arm64 /tmp/linux-arm64/ek
-                    chmod +x /tmp/linux-arm64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Linux_arm64.tar.gz" -C /tmp/linux-arm64 ek
-                  fi
+                  bun build src/cli.ts \
+                    --compile \
+                    --target=bun-darwin-arm64 \
+                    --outfile=dist/bin/ek-darwin-arm64 \
+                    --define:API_BASE_URL_DEFAULT='"https://api.enkryptify.com"' \
+                    --define:APP_BASE_URL_DEFAULT='"https://app.enkryptify.com"' \
+                    --define:CLI_VERSION_DEFAULT='"0.2.0-alpha.1"' \
+                    --define:GCP_AUTH_URL_DEFAULT='"https://www.googleapis.com/auth/cloud-platform"' \
+                    --define:GCP_AUTH_SCOPES='"https://www.googleapis.com/auth/cloud-platform"'
 
-                  # macOS x64
-                  if [ -f "cli-macos" ]; then
-                    mkdir -p /tmp/macos-x64
-                    cp cli-macos /tmp/macos-x64/ek
-                    chmod +x /tmp/macos-x64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Darwin_x86_64.tar.gz" -C /tmp/macos-x64 ek
-                  fi
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek-darwin-x64
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek-darwin-arm64
 
-                  # macOS ARM64
-                  if [ -f "cli-macos-arm64" ]; then
-                    mkdir -p /tmp/macos-arm64
-                    cp cli-macos-arm64 /tmp/macos-arm64/ek
-                    chmod +x /tmp/macos-arm64/ek
-                    tar -czf "$GITHUB_WORKSPACE/dist/archives/enkryptify_Darwin_arm64.tar.gz" -C /tmp/macos-arm64 ek
-                  fi
+                  (cd dist/archives && shasum -a 256 * > checksums.txt)
 
-                  # Windows x64
-                  if [ -f "cli-win.exe" ]; then
-                    mkdir -p /tmp/windows-x64
-                    cp cli-win.exe /tmp/windows-x64/ek.exe
-                    cd /tmp/windows-x64
-                    zip -r "$GITHUB_WORKSPACE/dist/archives/enkryptify_Windows_x86_64.zip" ek.exe
-                  fi
-
-                  cd "$GITHUB_WORKSPACE"
-
-            - name: Generate checksums
+            - name: Move tag v0.0.0-test to this commit
+              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+              shell: bash
               run: |
-                  cd dist/archives
-                  sha256sum * > checksums.txt
+                  set -euo pipefail
+                  git config user.name  "Enkryptify Bot"
+                  git config user.email "bot@enkryptify.com"
+                  git tag -f v0.0.0-test
+                  git push -f origin v0.0.0-test
 
-            - name: Generate changelog
-              id: changelog
-              run: |
-                  LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-                  if [ -z "$LAST_TAG" ]; then
-                    CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges | grep -vE '^(docs|test|ci):|Merge (pull request|branch)' | head -50)
-                  else
-                    CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -vE '^(docs|test|ci):|Merge (pull request|branch)')
-                  fi
-
-                  {
-                    echo 'changelog<<EOF'
-                    echo "$CHANGELOG"
-                    echo EOF
-                  } >> $GITHUB_OUTPUT
-
-            - name: Create GitHub Release
-              uses: softprops/action-gh-release@v1
+            - name: Publish / update GitHub prerelease (v0.0.0-test)
+              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+              uses: softprops/action-gh-release@v2
               with:
+                  tag_name: v0.0.0-test
+                  name: Test Release v0.0.0-test
+                  prerelease: true
+                  overwrite_files: true
                   files: |
                       dist/archives/*
-                  name: Release ${{ github.ref_name }}
                   body: |
-                      ## What's Changed
+                      ⚠️ Test prerelease from branch `release-test`
+                      Commit: ${{ github.sha }}
 
-                      ${{ steps.changelog.outputs.changelog }}
+                      ## macOS (Apple Silicon)
+                      tar -xzf enkryptify_Darwin_arm64.tar.gz
+                      chmod +x ek-darwin-arm64
+                      xattr -dr com.apple.quarantine ek-darwin-arm64 || true
+                      ./ek-darwin-arm64 --help
 
-                      ## Installation
-
-                      ### macOS (Homebrew)
-                      ```bash
-                      brew install enkryptify/enkryptify/enkryptify
-                      ```
-
-                      ### Windows (Scoop)
-                      ```powershell
-                      scoop bucket add enkryptify https://github.com/enkryptify/scoop-enkryptify.git
-                      scoop install enkryptify
-                      ```
-
-                      ### Linux
-                      Download the appropriate `.tar.gz` file and extract:
-                      ```bash
-                      tar -xzf enkryptify_Linux_x86_64.tar.gz
-                      sudo mv ek /usr/local/bin/
-                      ```
-
-                      ## Checksums
-                      See `checksums.txt` for SHA256 checksums of all binaries.
-                  draft: false
-                  prerelease: ${{ contains(github.ref_name, '-') }}
+                      ## macOS (Intel)
+                      tar -xzf enkryptify_Darwin_x86_64.tar.gz
+                      chmod +x ek-darwin-x64
+                      xattr -dr com.apple.quarantine ek-darwin-x64 || true
+                      ./ek-darwin-x64 --help
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Update Homebrew Formula
-              if: startsWith(github.ref, 'refs/tags/v')
-              run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
-                  SHA256=$(sha256sum dist/archives/enkryptify_Darwin_x86_64.tar.gz | cut -d' ' -f1)
-                  URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/enkryptify_Darwin_x86_64.tar.gz"
-
-                  git clone https://github.com/enkryptify/homebrew-enkryptify.git /tmp/homebrew-tap
-                  cd /tmp/homebrew-tap
-
-                  cat > Formula/enkryptify.rb << EOF
-                  class Enkryptify < Formula
-                    desc "Official Enkryptify CLI for injecting secrets into your codebase"
-                    homepage "https://enkryptify.com"
-                    url "${URL}"
-                    sha256 "${SHA256}"
-                    version "${VERSION}"
-                    
-                    def install
-                      bin.install "ek"
-                    end
-                    
-                    test do
-                      system "#{bin}/ek --version"
-                    end
-                  end
-                  EOF
-
-                  git config user.name "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-                  git add Formula/enkryptify.rb
-                  git commit -m "Brew formula update for enkryptify version v${VERSION}" || exit 0
-                  git push https://${{ secrets.GH_TOKEN }}@github.com/enkryptify/homebrew-enkryptify.git
-              env:
-                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-            - name: Update Scoop Manifest
-              if: startsWith(github.ref, 'refs/tags/v')
-              run: |
-                  VERSION=${GITHUB_REF#refs/tags/v}
-                  SHA256=$(sha256sum dist/archives/enkryptify_Windows_x86_64.zip | cut -d' ' -f1)
-                  URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/enkryptify_Windows_x86_64.zip"
-
-                  git clone https://github.com/enkryptify/scoop-enkryptify.git /tmp/scoop-bucket
-                  cd /tmp/scoop-bucket
-
-                  cat > enkryptify.json << EOF
-                  {
-                    "version": "${VERSION}",
-                    "description": "Official Enkryptify CLI for injecting secrets into your codebase",
-                    "homepage": "https://enkryptify.com",
-                    "license": "GPL-3.0-only",
-                    "architecture": {
-                      "64bit": {
-                        "url": "${URL}",
-                        "hash": "${SHA256}"
-                      }
-                    },
-                    "bin": "ek.exe",
-                    "checkver": {
-                      "github": "${{ github.repository }}"
-                    },
-                    "autoupdate": {
-                      "architecture": {
-                        "64bit": {
-                          "url": "https://github.com/${{ github.repository }}/releases/download/v\$version/enkryptify_Windows_x86_64.zip"
-                        }
-                      }
-                    }
-                  }
-                  EOF
-
-                  git config user.name "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-                  git add enkryptify.json
-                  git commit -m "Scoop update for enkryptify version v${VERSION}" || exit 0
-                  git push https://${{ secrets.GH_TOKEN }}@github.com/Enkryptify/scoop-enkryptify.git
-              env:
-                  GH_TOKEN: ${{ secrets.GH_TOKEN }}
