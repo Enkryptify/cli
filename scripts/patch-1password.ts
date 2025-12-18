@@ -6,9 +6,10 @@ console.log("🔧 Patching 1Password SDK for bundled execution...\n");
 const sdkPath = resolve("node_modules/@1password/sdk-core/nodejs/index.js");
 
 if (!existsSync(sdkPath)) {
-    console.error("❌ 1Password SDK not found at:", sdkPath);
-    console.error("   Make sure @1password/sdk is installed");
-    process.exit(1);
+    console.warn("⚠️  1Password SDK not found yet at:", sdkPath);
+    console.warn("   This is normal during initial install. SDK will be patched after installation completes.");
+    console.warn("   If you see this after install, run: bun run patch:1password\n");
+    process.exit(0); // Exit successfully, don't fail the install
 }
 
 let content = readFileSync(sdkPath, "utf-8");

@@ -35,17 +35,21 @@ jobs:
                   bun-version: latest
 
             - name: Install deps
-              run: bun install
+              run: bun install --ignore-scripts
 
-            - name: Verify 1Password SDK patch
+            - name: Patch 1Password SDK for bundling
               shell: bash
               run: |
-                  echo "Checking if 1Password SDK was patched..."
+                  echo "🔧 Patching 1Password SDK..."
+                  bun run scripts/patch-1password.ts
+
+                  echo ""
+                  echo "Verifying patch..."
                   if grep -q "ENKRYPTIFY BUNDLING PATCH" node_modules/@1password/sdk-core/nodejs/index.js; then
                     echo "✅ SDK successfully patched"
                   else
-                    echo "⚠️ SDK patch not found - manually running patch script"
-                    bun run scripts/patch-1password.ts
+                    echo "❌ SDK patch verification failed"
+                    exit 1
                   fi
 
             - name: Build macOS binaries (x64 + arm64)
