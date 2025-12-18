@@ -12,18 +12,31 @@ import { GcpAuth } from "./auth";
 export class GcpProvider implements Provider {
     readonly name = "gcp";
     private auth: GcpAuth;
-    private projectsClient: ProjectsClient;
-    private secretsClient: SecretManagerServiceClient;
+
+    private projectsClient?: ProjectsClient;
+    private secretsClient?: SecretManagerServiceClient;
+
     constructor() {
         this.auth = new GcpAuth();
-        this.projectsClient = new ProjectsClient();
-        this.secretsClient = new SecretManagerServiceClient();
     }
 
-    login(options?: LoginOptions): Promise<void> {
-        return this.auth.login(options);
+    private async ensureClients(): Promise<void> {
+        if (this.projectsClient && this.secretsClient) return;
+
+        const authClient = await this.auth.getAuthClient();
+
+        this.projectsClient = new ProjectsClient({ authClient });
+        this.secretsClient = new SecretManagerServiceClient({ authClient });
     }
+
+    async login(options?: LoginOptions): Promise<void> {
+        await this.auth.login(options);
+        await this.ensureClients();
+    }
+
     async configure(options: string): Promise<ProjectConfig> {
+        await this.ensureClients();
+
         const setup = await config.getConfigure(options);
         if (setup) {
             const overwrite = await confirm("Setup already exists. Overwrite?");
@@ -33,7 +46,7 @@ export class GcpProvider implements Provider {
         }
 
         try {
-            const [projects] = await this.projectsClient.searchProjects({});
+            const [projects] = await this.projectsClient!.searchProjects({});
             if (projects.length === 0) {
                 throw new Error("No projects found. Please create a project first before setting up.");
             }
@@ -69,18 +82,22 @@ export class GcpProvider implements Provider {
             throw new Error(`Failed to configure GCP project message: ${message}`);
         }
     }
-    async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
-        const { projectId } = config;
 
+    async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
+        await this.ensureClients();
+
+        const { projectId } = config;
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first.");
         }
-        console.log(options?.env);
-        return await this.getAllSecretsWithAllVersions(projectId, options?.env);
-    }
-    async createSecret(config: ProjectConfig, name: string, value: string): Promise<void> {
-        const { projectId } = config;
 
+        return this.getAllSecretsWithAllVersions(projectId, options?.env);
+    }
+
+    async createSecret(config: ProjectConfig, name: string, value: string): Promise<void> {
+        await this.ensureClients();
+
+        const { projectId } = config;
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first before creating secrets.");
         }
@@ -97,27 +114,19 @@ export class GcpProvider implements Provider {
 
         try {
             try {
-                await this.secretsClient.createSecret({
+                await this.secretsClient!.createSecret({
                     parent,
                     secretId: name,
-                    secret: {
-                        replication: {
-                            automatic: {},
-                        },
-                    },
+                    secret: { replication: { automatic: {} } },
                 });
             } catch (err: unknown) {
                 const message = err instanceof Error ? err.message : String(err);
-                if (!message.includes("ALREADY_EXISTS")) {
-                    throw err;
-                }
+                if (!message.includes("ALREADY_EXISTS")) throw err;
             }
 
-            await this.secretsClient.addSecretVersion({
+            await this.secretsClient!.addSecretVersion({
                 parent: `${parent}/secrets/${name}`,
-                payload: {
-                    data: Buffer.from(value, "utf8"),
-                },
+                payload: { data: Buffer.from(value, "utf8") },
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
@@ -126,8 +135,9 @@ export class GcpProvider implements Provider {
     }
 
     async updateSecret(config: ProjectConfig, name: string, _isPersonal?: boolean): Promise<void> {
-        const { projectId } = config;
+        await this.ensureClients();
 
+        const { projectId } = config;
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first before updating secrets.");
         }
@@ -139,7 +149,7 @@ export class GcpProvider implements Provider {
         const secretName = `projects/${projectId}/secrets/${name}`;
 
         try {
-            await this.secretsClient.getSecret({ name: secretName });
+            await this.secretsClient!.getSecret({ name: secretName });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             throw new Error(`Secret "${name}" not found or cannot be read: ${message}`);
@@ -152,11 +162,9 @@ export class GcpProvider implements Provider {
         }
 
         try {
-            await this.secretsClient.addSecretVersion({
+            await this.secretsClient!.addSecretVersion({
                 parent: secretName,
-                payload: {
-                    data: Buffer.from(newValue, "utf8"),
-                },
+                payload: { data: Buffer.from(newValue, "utf8") },
             });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
@@ -165,8 +173,9 @@ export class GcpProvider implements Provider {
     }
 
     async deleteSecret(config: ProjectConfig, name: string): Promise<void> {
-        const { projectId } = config;
+        await this.ensureClients();
 
+        const { projectId } = config;
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first before deleting secrets.");
         }
@@ -178,23 +187,20 @@ export class GcpProvider implements Provider {
         const secretName = `projects/${projectId}/secrets/${name}`;
 
         try {
-            await this.secretsClient.deleteSecret({
-                name: secretName,
-            });
+            await this.secretsClient!.deleteSecret({ name: secretName });
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : String(error);
             throw new Error(`Failed to delete secret "${name}" from GCP Secret Manager: ${message}`);
         }
     }
+
     async listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]> {
         const { projectId } = config;
-
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first.");
         }
 
         const shouldShow = showValues === "show";
-
         const allSecrets = await this.getAllSecretsWithAllVersions(projectId);
 
         return allSecrets.map((s) => ({
@@ -204,16 +210,12 @@ export class GcpProvider implements Provider {
     }
 
     async getAllSecretsWithAllVersions(projectId: string, env?: string): Promise<Secret[]> {
-        let parent: string;
-        if (env) {
-            parent = `projects/${env}`;
-        } else {
-            parent = `projects/${projectId}`;
-        }
+        await this.ensureClients();
+
+        const parent = env ? `projects/${env}` : `projects/${projectId}`;
 
         try {
-            const [secrets] = await this.secretsClient.listSecrets({ parent });
-
+            const [secrets] = await this.secretsClient!.listSecrets({ parent });
             if (secrets.length === 0) {
                 throw new Error("No secrets found in project. Please create a secret first.");
             }
@@ -223,29 +225,21 @@ export class GcpProvider implements Provider {
             for (const meta of secrets) {
                 if (!meta.name) continue;
 
-                const secretResourceName = meta.name;
-                const secretId = secretResourceName.split("/").pop() ?? secretResourceName;
-
-                const [versions] = await this.secretsClient.listSecretVersions({
-                    parent: secretResourceName,
-                });
+                const secretId = meta.name.split("/").pop()!;
+                const [versions] = await this.secretsClient!.listSecretVersions({ parent: meta.name });
 
                 for (const v of versions) {
                     if (!v.name) continue;
 
-                    const [version] = await this.secretsClient.accessSecretVersion({ name: v.name });
-
-                    const value =
-                        version.payload?.data instanceof Uint8Array
-                            ? Buffer.from(version.payload.data).toString("utf8")
-                            : "";
-
-                    const versionId = v.name.split("/").pop() ?? v.name;
+                    const [version] = await this.secretsClient!.accessSecretVersion({ name: v.name });
 
                     all.push({
-                        id: `${secretId}:${versionId}`,
+                        id: `${secretId}:${v.name.split("/").pop()}`,
                         name: secretId,
-                        value,
+                        value:
+                            version.payload?.data instanceof Uint8Array
+                                ? Buffer.from(version.payload.data).toString("utf8")
+                                : "",
                     });
                 }
             }
