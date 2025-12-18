@@ -78,8 +78,15 @@ export class GcpProvider implements Provider {
             showMessage(`Setup completed successfully! Project: ${project.name}/(${project.projectId})`);
             return projectConfig;
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error);
-            throw new Error(`Failed to configure GCP project message: ${message}`);
+            console.error("Raw GCP error:", error);
+
+            const message =
+                (error as { details?: string; message?: string })?.details ??
+                (error as { details?: string })?.details ??
+                (error as { message?: string })?.message ??
+                JSON.stringify(error, null, 2);
+
+            throw new Error(`Failed to configure GCP project: ${message}`);
         }
     }
 
