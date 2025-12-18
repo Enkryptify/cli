@@ -4,12 +4,16 @@
   "type": "module",
   "private": true,
   "scripts": {
+
+    
     "build": "bun build src/cli.ts --outdir dist --target node --minify",
     "package": "bun run build && pkg dist/cli.js --out-path bin --targets node18-linux-x64,node18-linux-arm64,node18-macos-x64,node18-macos-arm64,node18-win-x64,node18-win-arm64",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "postinstall": "bun run scripts/patch-1password.ts"
+
   },
   "pkg": {
     "scripts": ["dist/**/*.js"],

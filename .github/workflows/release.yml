@@ -37,6 +37,17 @@ jobs:
             - name: Install deps
               run: bun install
 
+            - name: Verify 1Password SDK patch
+              shell: bash
+              run: |
+                  echo "Checking if 1Password SDK was patched..."
+                  if grep -q "ENKRYPTIFY BUNDLING PATCH" node_modules/@1password/sdk-core/nodejs/index.js; then
+                    echo "✅ SDK successfully patched"
+                  else
+                    echo "⚠️ SDK patch not found - manually running patch script"
+                    bun run scripts/patch-1password.ts
+                  fi
+
             - name: Build macOS binaries (x64 + arm64)
               shell: bash
               run: |
@@ -59,10 +70,29 @@ jobs:
                     --target=bun-darwin-arm64 \
                     --outfile=dist/bin/ek-darwin-arm64
 
-                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek-darwin-x64
-                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek-darwin-arm64
+                  # Copy WASM file needed by 1Password SDK
+                  if [ -f "node_modules/@1password/sdk-core/nodejs/core_bg.wasm" ]; then
+                    cp node_modules/@1password/sdk-core/nodejs/core_bg.wasm dist/bin/
+                    echo "✅ Copied 1Password WASM file"
+                  else
+                    echo "❌ ERROR: 1Password WASM file not found!"
+                    exit 1
+                  fi
 
+                  # Create archives with binary and WASM file
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek-darwin-x64 core_bg.wasm
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek-darwin-arm64 core_bg.wasm
+
+                  # Generate checksums
                   (cd dist/archives && shasum -a 256 * > checksums.txt)
+
+                  # Show what we built
+                  echo ""
+                  echo "📦 Built artifacts:"
+                  ls -lh dist/archives/
+                  echo ""
+                  echo "Archive contents:"
+                  tar -tzf dist/archives/enkryptify_Darwin_arm64.tar.gz
 
             - name: Move tag v0.0.0-test to this commit
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
@@ -85,19 +115,39 @@ jobs:
                   files: |
                       dist/archives/*
                   body: |
-                      ⚠️ Test prerelease from branch `release-test`
+                      ⚠️ Test prerelease from branch `1password/integration`
                       Commit: ${{ github.sha }}
 
-                      ## macOS (Apple Silicon)
+                      ## Installation & Usage
+
+                      ### macOS (Apple Silicon - M1/M2/M3)
+                      ```bash
+                      # Download and extract
+                      curl -L -O https://github.com/${{ github.repository }}/releases/download/v0.0.0-test/enkryptify_Darwin_arm64.tar.gz
                       tar -xzf enkryptify_Darwin_arm64.tar.gz
+
+                      # Make executable and remove quarantine
                       chmod +x ek-darwin-arm64
                       xattr -dr com.apple.quarantine ek-darwin-arm64 || true
-                      API_BASE_URL=... APP_BASE_URL=... CLI_VERSION=0.0.0-test ./ek-darwin-arm64 --help
 
-                      ## macOS (Intel)
+                      # Run (ensure core_bg.wasm is in the same directory)
+                      ./ek-darwin-arm64 --help
+                      ```
+
+                      ### macOS (Intel)
+                      ```bash
+                      # Download and extract
+                      curl -L -O https://github.com/${{ github.repository }}/releases/download/v0.0.0-test/enkryptify_Darwin_x86_64.tar.gz
                       tar -xzf enkryptify_Darwin_x86_64.tar.gz
+
+                      # Make executable and remove quarantine
                       chmod +x ek-darwin-x64
                       xattr -dr com.apple.quarantine ek-darwin-x64 || true
-                      API_BASE_URL=... APP_BASE_URL=... CLI_VERSION=0.0.0-test ./ek-darwin-x64 --help
+
+                      # Run (ensure core_bg.wasm is in the same directory)
+                      ./ek-darwin-x64 --help
+                      ```
+
+                      ⚠️ **Important**: Both the executable and `core_bg.wasm` must be in the same directory for the CLI to work.
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
