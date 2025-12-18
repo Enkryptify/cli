@@ -1,6 +1,11 @@
 import { config } from "@/lib/config";
+import { keyring } from "@/lib/keyring";
 import { GoogleAuth } from "google-auth-library";
 import type { AuthProvider, Credentials, LoginOptions } from "../base/AuthProvider";
+
+type StoredAuthData = {
+    accessToken: string;
+};
 
 export class GcpAuth implements AuthProvider {
     private readonly PROVIDER_NAME = "gcp";
@@ -8,54 +13,71 @@ export class GcpAuth implements AuthProvider {
 
     constructor() {
         this.googleAuth = new GoogleAuth({
-            scopes: [process.env.GCP_SCOPES ?? ""],
+            scopes: ["https://www.googleapis.com/auth/cloud-platform"],
         });
     }
 
-    async getAuthClient() {
+    async login(_options?: LoginOptions): Promise<void> {
         try {
             const client = await this.googleAuth.getClient();
+            const tokenResponse = await client.getAccessToken();
 
-            if (!client) {
-                throw new Error("GoogleAuth returned no auth client");
+            if (!tokenResponse?.token) {
+                throw new Error("No access token returned from Google");
             }
 
-            return client;
+            const authData: StoredAuthData = {
+                accessToken: tokenResponse.token,
+            };
+
+            await keyring.set(this.PROVIDER_NAME, JSON.stringify(authData));
+            await config.updateProvider(this.PROVIDER_NAME, {});
+            console.log("✅ Google Cloud authenticated (ADC)");
+            console.log("ℹ️  Using Application Default Credentials from gcloud");
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-
             throw new Error(
-                `Failed to initialize Google authentication client. ` +
-                    `Make sure you ran:\n` +
-                    `  gcloud auth application-default login\n\n` +
+                `Google Cloud authentication failed.\n` +
+                    `Run:\n  gcloud auth application-default login\n\n` +
                     `Original error: ${message}`,
-                { cause: err instanceof Error ? err : undefined },
             );
         }
     }
 
-    async login(options?: LoginOptions): Promise<void> {
-        console.log("Logging in to Google Cloud...", options);
-
+    async getCredentials(): Promise<Credentials> {
         try {
-            const client = await this.getAuthClient();
-            const projectId = await this.googleAuth.getProjectId();
-
-            if ("getAccessToken" in client) {
-                await client.getAccessToken();
+            const authDataString = await keyring.get(this.PROVIDER_NAME);
+            if (authDataString) {
+                try {
+                    const authData = JSON.parse(authDataString) as StoredAuthData;
+                    if (authData?.accessToken) {
+                        return { accessToken: authData.accessToken };
+                    }
+                } catch {
+                    throw new Error("could fetch auth the token");
+                }
             }
 
-            console.log("✅ Google Cloud authenticated");
-            console.log("Project:", projectId);
+            const client = await this.googleAuth.getClient();
+            const tokenResponse = await client.getAccessToken();
 
-            await config.updateProvider(this.PROVIDER_NAME, {});
+            if (!tokenResponse?.token) {
+                throw new Error("No access token returned from Google");
+            }
+
+            const authData: StoredAuthData = {
+                accessToken: tokenResponse.token,
+            };
+
+            await keyring.set(this.PROVIDER_NAME, JSON.stringify(authData));
+            return { accessToken: tokenResponse.token };
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : String(err);
-            throw new Error(`Google Cloud authentication failed: ${message}`);
+            throw new Error(
+                `Failed to obtain Google access token.\n` +
+                    `Run:\n  gcloud auth application-default login\n\n` +
+                    `Original error: ${message}`,
+            );
         }
-    }
-
-    getCredentials(): Promise<Credentials> {
-        throw new Error("Not implemented");
     }
 }
