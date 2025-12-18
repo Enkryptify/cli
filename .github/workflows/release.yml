@@ -43,8 +43,8 @@ jobs:
                   set -euo pipefail
                   mkdir -p dist/bin dist/archives
 
-                  bun build src/cli.ts --compile --compile-autoload-tsconfig --compile-autoload-package-json --target=bun-darwin-x64   --outfile=dist/bin/ek-darwin-x64
-                  bun build src/cli.ts --compile  --compile-autoload-tsconfig --compile-autoload-package-json --target=bun-darwin-arm64 --outfile=dist/bin/ek-darwin-arm64
+                  bun build src/cli.ts --compile --compile-autoload-tsconfig --compile-autoload-package-json --external=react-devtools-core --target=bun-darwin-x64   --outfile=dist/bin/ek-darwin-x64
+                  bun build src/cli.ts --compile  --compile-autoload-tsconfig --compile-autoload-package-json --external=react-devtools-core --target=bun-darwin-arm64 --outfile=dist/bin/ek-darwin-arm64
 
                   tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek-darwin-x64
                   tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek-darwin-arm64
