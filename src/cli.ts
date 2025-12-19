@@ -22,7 +22,7 @@ program.configureOutput({
 });
 
 program
-    .name("kk")
+    .name("ek")
     .description("Enkryptify CLI")
     .version(env.CLI_VERSION ?? "0.0.0", "-v, --version");
 

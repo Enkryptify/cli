@@ -1,10 +1,13 @@
-_ek() {
-  local cur
+_ek_complete() {
+  local cur prev words
   COMPREPLY=()
+  words=("${COMP_WORDS[@]}")
   cur="${COMP_WORDS[COMP_CWORD]}"
-  
-  local cmd="${COMP_WORDS[0]}"
-  mapfile -t COMPREPLY < <($cmd __complete "${COMP_WORDS[@]:1}")
+
+  local completions
+  completions=$(ek __complete "${words[@]:1}")
+
+  COMPREPLY=( $(compgen -W "$completions" -- "$cur") )
 }
 
-complete -F _ek ek ek-darwin-arm64 ek-darwin-x64 ek-linux-arm64 ek-linux-x64 ek-win-x64 ek-win-arm64
+complete -F _ek_complete ek
