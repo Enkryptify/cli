@@ -1,13 +1,8 @@
 _ek_complete() {
-  local cur prev words
-  COMPREPLY=()
-  words=("${COMP_WORDS[@]}")
-  cur="${COMP_WORDS[COMP_CWORD]}"
-
-  local completions
-  completions=$(ek __complete "${words[@]:1}")
-
-  COMPREPLY=( $(compgen -W "$completions" -- "$cur") )
+  local IFS=$'\n'
+  COMPREPLY=($(ek __complete "${COMP_WORDS[@]:1}"))
 }
 
 complete -F _ek_complete ek
+
+

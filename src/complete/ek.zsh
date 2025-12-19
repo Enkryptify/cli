@@ -1,8 +1,7 @@
+#compdef ek
+
 _ek() {
-  local cur
-  cur="${COMP_WORDS[COMP_CWORD]}"
-
-  COMPREPLY=($(ek __complete "${COMP_WORDS[@]:1}"))
+  local -a completions
+  completions=("${(@f)$(ek __complete "${words[@]:1}")}")
+  _describe 'values' completions
 }
-
-complete -F _ek ek
