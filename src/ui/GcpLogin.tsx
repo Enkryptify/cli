@@ -22,10 +22,10 @@ export function GcpLogin({ provider, options, onError, onComplete }: GcpLoginPro
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage("Authenticating with Google Cloud...");
+                setMessage(`Authenticating with ${provider.name}...`);
                 await provider.login(options);
                 setStatus("success");
-                setMessage("✅ Google Cloud authenticated");
+                setMessage(`✓ Successfully authenticated with ${provider.name}`);
                 process.nextTick(() => {
                     onCompleteRef.current?.();
                 });

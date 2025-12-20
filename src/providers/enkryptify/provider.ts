@@ -2,8 +2,8 @@ import { type ProjectConfig, config } from "@/lib/config";
 import { getSecureInput, getTextInput } from "@/lib/input";
 import type { LoginOptions } from "@/providers/base/AuthProvider";
 import type { Provider, Secret, runOptions } from "@/providers/base/Provider";
-import { EnkryptifyAuth } from "@/providers/enkryptfiy/auth";
-import http from "@/providers/enkryptfiy/httpClient";
+import { EnkryptifyAuth } from "@/providers/enkryptify/auth";
+import http from "@/providers/enkryptify/httpClient";
 import { confirm } from "@/ui/Confirm";
 import { selectName } from "@/ui/SelectItem";
 import { showMessage } from "@/ui/SuccessMessage";
@@ -356,7 +356,7 @@ export class EnkryptifyProvider implements Provider {
     private async fetchResource<T extends Resource>(url: string): Promise<T[]> {
         try {
             const response = await http.get<T[]>(url);
-            if (!response.data) {
+            if (!response.data || response.data.length === 0) {
                 const resourceName = url.split("/").filter(Boolean).pop() || "resource";
                 throw new Error(`No ${resourceName} found. Please create a ${resourceName} first.`);
             }

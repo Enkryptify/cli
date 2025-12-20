@@ -40,7 +40,7 @@ export function registerCreateCommand(program: Command) {
         .argument("<name>", "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-)")
         .argument(
             "[value]",
-            'Secret value. Use quotes for values with spaces or special characters  Example: ek create <name> "my value!@#$%^&*()"',
+            'Secret value. Use quotes for values with spaces or special characters. Example: ek create <name> "my value!@#$%^&*()"',
         )
         .action(async (name: string, value?: string) => {
             try {

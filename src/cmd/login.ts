@@ -34,24 +34,17 @@ export function registerLoginCommand(program: Command) {
 
                 process.exit(1);
             }
-
-            try {
-                await LoginFlow({
-                    provider: providerInstance,
-                    options: {
-                        providerName: providerName,
-                        force: options.force,
-                    },
-                    onError: (error) => {
-                        const errorMessage = error instanceof Error ? error.message : String(error);
-                        logError(errorMessage);
-                        process.exit(1);
-                    },
-                });
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
-                process.exit(1);
-            }
+            await LoginFlow({
+                provider: providerInstance,
+                options: {
+                    providerName: providerName,
+                    force: options.force,
+                },
+                onError: (error: Error) => {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    logError(errorMessage);
+                    process.exit(1);
+                },
+            });
         });
 }

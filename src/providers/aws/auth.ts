@@ -26,7 +26,6 @@ export class AwsAuth implements AuthProvider {
             throw new Error("AWS authentication failed");
         }
     }
-
     getCredentials(): Promise<Credentials> {
         throw new Error("Method not implemented.");
     }

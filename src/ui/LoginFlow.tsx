@@ -14,6 +14,13 @@ export interface LoginFlowProps {
 }
 
 function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlowProps) {
+    useEffect(() => {
+        const knownProviders = ["enkryptify", "aws", "gcp"];
+        if (!knownProviders.includes(provider.name)) {
+            onError?.(new Error(`Unknown provider: ${provider.name}`));
+        }
+    }, [provider.name, onError]);
+
     const renderProviderComponent = () => {
         switch (provider.name) {
             case "enkryptify":
@@ -26,9 +33,6 @@ function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlo
                 return <GcpLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />;
 
             default:
-                useEffect(() => {
-                    onError?.(new Error(`Unknown provider: ${provider.name}`));
-                }, []);
                 return (
                     <Box>
                         <Text>Unknown provider: {provider.name}</Text>

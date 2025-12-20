@@ -1,11 +1,17 @@
 import { createEnv } from "@t3-oss/env-core";
+import { readFileSync } from "fs";
 import { z } from "zod";
+
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync("./package.json", "utf-8")) as { version: string };
+const packageVersion = packageJson.version || "0.0.0";
 
 const defaults = {
     API_BASE_URL: "https://api.enkryptify.com",
     APP_BASE_URL: "https://app.enkryptify.com",
     GCP_RESOURCE_MANAGER_API: "https://cloudresourcemanager.googleapis.com/v1",
-    CLI_VERSION: "0.0.0",
+    // Priority: env var > package.json > default
+    CLI_VERSION: process.env.CLI_VERSION || packageVersion,
 };
 
 const runtimeEnv = {

@@ -98,6 +98,14 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: Get version from package.json
+              id: version
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  TAG="v${VERSION}-test"
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+
             - uses: actions/download-artifact@v4
               with:
                   path: dist/archives
@@ -114,14 +122,14 @@ jobs:
               run: |
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
-                  git tag -f v0.0.0-test
-                  git push -f origin v0.0.0-test
+                  git tag -f ${{ steps.version.outputs.tag }}
+                  git push -f origin ${{ steps.version.outputs.tag }}
 
             - name: Publish GitHub prerelease
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
               uses: softprops/action-gh-release@v2
               with:
-                  tag_name: v0.0.0-test
+                  tag_name: ${{ steps.version.outputs.tag }}
                   prerelease: true
                   overwrite_files: true
                   files: dist/archives/*
@@ -143,19 +151,21 @@ jobs:
 
                   ARM_SHA=$(grep enkryptify_Darwin_arm64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
                   X64_SHA=$(grep enkryptify_Darwin_x86_64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
+                  VERSION="${{ steps.version.outputs.version }}"
+                  TAG="${{ steps.version.outputs.tag }}"
 
                   cat > Formula/enkryptify.rb <<EOF
                   class Enkryptify < Formula
                     desc "Enkryptify CLI (test)"
                     homepage "https://enkryptify.com"
-                    version "0.0.0-test"
+                    version "${VERSION}-test"
 
                     on_macos do
                       if Hardware::CPU.arm?
-                        url "https://github.com/Enkryptify/cli/releases/download/v0.0.0-test/enkryptify_Darwin_arm64.tar.gz"
+                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_arm64.tar.gz"
                         sha256 "${ARM_SHA}"
                       else
-                        url "https://github.com/Enkryptify/cli/releases/download/v0.0.0-test/enkryptify_Darwin_x86_64.tar.gz"
+                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_x86_64.tar.gz"
                         sha256 "${X64_SHA}"
                       end
                     end
@@ -174,5 +184,5 @@ jobs:
                   EOF
 
                   git add Formula/enkryptify.rb
-                  git commit -m "Update test formula v0.0.0-test"
+                  git commit -m "Update test formula ${{ steps.version.outputs.tag }}"
                   git push

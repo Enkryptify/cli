@@ -18,10 +18,11 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage(`Authenticating with enkryptify...`);
+                setMessage(`Authenticating with ${provider.name}...`);
                 await provider.login(options);
                 setStatus("success");
-                setMessage(`✓ Successfully authenticated with enkryptify`);
+                setMessage(`✓ Successfully authenticated with ${provider.name}`);
+
                 setTimeout(() => {
                     onComplete?.();
                 }, 1000);
@@ -34,7 +35,7 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
         };
 
         void performLogin();
-    }, [provider, options, onError, onComplete]);
+    }, [provider, options]);
 
     return (
         <>

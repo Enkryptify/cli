@@ -42,19 +42,19 @@ export class GcpProvider implements Provider {
                 throw new Error("No projects found. Please create a project first before setting up.");
             }
 
+            const projectMap = new Map<string, (typeof projects)[number]>();
             const labels = projects.map((p) => {
                 const name = p.displayName ?? p.name ?? "Unnamed project";
                 const id = p.projectId ?? "unknown-id";
-                return `${name}/${id}`;
+                const label = `${name} (${id})`;
+                projectMap.set(label, p);
+                return label;
             });
 
             const selected = await selectName(labels, "Select project");
             if (!selected) throw new Error("Failed to select project");
 
-            const selectedId = selected.split("/").pop();
-            if (!selectedId) throw new Error("Failed to parse selected project id");
-
-            const project = projects.find((p) => p.projectId === selectedId);
+            const project = projectMap.get(selected);
             if (!project || !project.name || !project.projectId) {
                 throw new Error("Failed to find selected project");
             }

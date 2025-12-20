@@ -18,10 +18,10 @@ export function AwsLogin({ provider, options, onError, onComplete }: AwsLoginPro
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage(`Authenticating with AWS...`);
+                setMessage(`Authenticating with ${provider.name}...`);
                 await provider.login(options);
                 setStatus("success");
-                setMessage(`✓ Successfully authenticated with AWS`);
+                setMessage(`✓ Successfully authenticated with ${provider.name}`);
                 process.nextTick(() => {
                     onComplete?.();
                 });

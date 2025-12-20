@@ -2,6 +2,9 @@ import { Box, Text, render } from "ink";
 import SelectInput from "ink-select-input";
 
 export async function selectName(options: string[], title?: string): Promise<string> {
+    if (!options.length) {
+        throw new Error("options array cannot be empty");
+    }
     const items = options.map((name, index) => ({
         label: name,
         value: name,

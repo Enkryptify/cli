@@ -2,7 +2,7 @@ import { env } from "@/env";
 import { config as configManager } from "@/lib/config";
 import { keyring } from "@/lib/keyring";
 import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider";
-import http from "@/providers/enkryptfiy/httpClient";
+import http from "@/providers/enkryptify/httpClient";
 import { createHash, randomBytes } from "crypto";
 import open from "open";
 import { URL } from "url";
