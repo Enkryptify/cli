@@ -203,6 +203,17 @@ export class AwsProvider implements Provider {
 
         try {
             await this.secretsClient.send(
+                new GetSecretValueCommand({
+                    SecretId: fullName,
+                }),
+            );
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`❌ Secret "${name}" not found: ${message}`, { cause: error });
+        }
+
+        try {
+            await this.secretsClient.send(
                 new DeleteSecretCommand({
                     SecretId: fullName,
                     ForceDeleteWithoutRecovery: true,
