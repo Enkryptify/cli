@@ -1,6 +1,7 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { getSecureInput, getTextInput } from "@/lib/input";
 import { AwsAuth } from "@/providers/aws/auth";
+import { confirm } from "@/ui/Confirm";
 import {
     CreateSecretCommand,
     DeleteSecretCommand,
@@ -99,9 +100,10 @@ export class AwsProvider implements Provider {
             matches.map(async (meta) => {
                 const valueRes = await this.secretsClient.send(
                     new GetSecretValueCommand({
-                        SecretId: meta.ARN ?? meta.Name!,
+                        SecretId: meta.ARN ?? meta.Name,
                     }),
                 );
+                if (!meta.Name) throw new Error("Secret metadata missing Name field");
 
                 const fullName = meta.Name!;
 

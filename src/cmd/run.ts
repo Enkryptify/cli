@@ -34,11 +34,15 @@ export async function runCommand(
 
     const proc = Bun.spawn([bin, ...args], {
         env: env,
+        stdin: "inherit",
         stdout: "inherit",
         stderr: "inherit",
     });
-
     await proc.exited;
+    const exitCode = await proc.exited;
+    if (exitCode !== 0) {
+        throw new Error(`Command exited with code ${exitCode}`);
+    }
 }
 
 export function registerRunCommand(program: Command) {

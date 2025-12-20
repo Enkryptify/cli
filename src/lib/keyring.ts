@@ -11,7 +11,12 @@ export interface Keyring {
 
 class OSKeyring implements Keyring {
     async set(key: string, value: string): Promise<void> {
-        await keytar.setPassword(SERVICE_NAME, key, value);
+        try {
+            await keytar.setPassword(SERVICE_NAME, key, value);
+        } catch (error: unknown) {
+            console.warn(error instanceof Error ? error.message : String(error));
+            throw error;
+        }
     }
 
     async get(key: string): Promise<string | null> {

@@ -48,7 +48,7 @@ export function registerCreateCommand(program: Command) {
                 if (!secretValue || secretValue.trim().length === 0) {
                     secretValue = await getSecureInput("Enter secret value: ");
                     if (!secretValue || secretValue.trim().length === 0) {
-                        throw new Error("Secret value cannot be empty please provide a value.");
+                        throw new Error("Secret value cannot be empty. please provide a value.");
                     }
                 }
                 await createSecretCommand(name, secretValue);

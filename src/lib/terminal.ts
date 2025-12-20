@@ -21,6 +21,7 @@ export function setupTerminalCleanup(): void {
 
     process.on("uncaughtException", (error) => {
         cleanup();
-        throw error;
+        console.error("Uncaught exception:", error);
+        process.exit(1);
     });
 }

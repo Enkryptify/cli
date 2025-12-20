@@ -1,17 +1,24 @@
 import prompts from "prompts";
 
 export async function getSecureInput(prompt: string): Promise<string> {
-    const response = await prompts({
-        type: "password",
-        name: "value",
-        message: prompt,
-        validate: (value: string) => {
-            if (!value || value.trim().length === 0) {
-                return "Value cannot be empty";
-            }
-            return true;
+    const response = await prompts(
+        {
+            type: "password",
+            name: "value",
+            message: prompt,
+            validate: (value: string) => {
+                if (!value || value.trim().length === 0) {
+                    return "Value cannot be empty";
+                }
+                return true;
+            },
         },
-    });
+        {
+            onCancel: () => {
+                process.exit(130);
+            },
+        },
+    );
 
     if (!response.value) {
         throw new Error("Input cancelled or empty");
@@ -21,11 +28,18 @@ export async function getSecureInput(prompt: string): Promise<string> {
 }
 
 export async function getTextInput(prompt: string): Promise<string> {
-    const response = await prompts({
-        type: "text",
-        name: "value",
-        message: prompt,
-    });
+    const response = await prompts(
+        {
+            type: "text",
+            name: "value",
+            message: prompt,
+        },
+        {
+            onCancel: () => {
+                process.exit(130);
+            },
+        },
+    );
 
     return (response.value as string) || "";
 }

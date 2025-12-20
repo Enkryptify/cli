@@ -1,6 +1,7 @@
 import type { LoginOptions } from "@/providers/base/AuthProvider";
 import type { Provider } from "@/providers/base/Provider";
 import { Box, Text, render } from "ink";
+import { useEffect } from "react";
 import { AwsLogin } from "./AwsLogin";
 import { EnkryptifyLogin } from "./EnkryptifyLogin";
 import { GcpLogin } from "./GcpLogin";
@@ -25,6 +26,9 @@ function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlo
                 return <GcpLogin provider={provider} options={options} onError={onError} onComplete={onComplete} />;
 
             default:
+                useEffect(() => {
+                    onError?.(new Error(`Unknown provider: ${provider.name}`));
+                }, []);
                 return (
                     <Box>
                         <Text>Unknown provider: {provider.name}</Text>
@@ -39,7 +43,7 @@ function LoginFlowComponent({ provider, options, onError, onComplete }: LoginFlo
         </Box>
     );
 }
-export async function LoginFlow({ provider, options, onError }: LoginFlowProps): Promise<void> {
+export async function LoginFlow({ provider, options, onError, onComplete }: LoginFlowProps): Promise<void> {
     return new Promise((resolve, reject) => {
         let isResolved = false;
 
@@ -61,6 +65,7 @@ export async function LoginFlow({ provider, options, onError }: LoginFlowProps):
                     isResolved = true;
                     process.nextTick(() => {
                         login.unmount();
+                        onComplete?.();
                         resolve();
                     });
                 }}

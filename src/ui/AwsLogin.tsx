@@ -65,9 +65,7 @@ export function AwsLogin({ provider, options, onError, onComplete }: AwsLoginPro
 
             {status === "loading" && (
                 <Box marginTop={1}>
-                    <Text>
-                        Using your local AWS CLI credentials (profile, SSO, or access keys) to verify your identity...
-                    </Text>
+                    <Text>Using your local AWS CLI credentials to verify your identity...</Text>
                 </Box>
             )}
         </>

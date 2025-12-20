@@ -6,8 +6,8 @@ export class AwsAuth implements AuthProvider {
     private readonly PROVIDER_NAME = "aws";
     private readonly awsClient = new STSClient({});
 
-    async login(options?: LoginOptions): Promise<void> {
-        console.log("Logging in to AWS...", options);
+    async login(_options?: LoginOptions): Promise<void> {
+        console.log("Logging in to AWS...");
         try {
             const result = await this.awsClient.send(new GetCallerIdentityCommand({}));
 
