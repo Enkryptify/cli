@@ -1,5 +1,5 @@
 import { AwsProvider } from "@/providers/aws/provider";
-import { EnkryptifyProvider } from "@/providers/enkryptify/provider";
+import { EnkryptifyProvider } from "@/providers/enkryptfiy/provider";
 import { GcpProvider } from "@/providers/gcp/provider";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 

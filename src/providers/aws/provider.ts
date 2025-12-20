@@ -1,7 +1,6 @@
 import { type ProjectConfig, config } from "@/lib/config";
-import { getSecureInput, getTextInput } from "@/lib/input";
+import { confirmPrompt, getSecureInput, getTextInput } from "@/lib/input";
 import { AwsAuth } from "@/providers/aws/auth";
-import { confirm } from "@/ui/Confirm";
 import {
     CreateSecretCommand,
     DeleteSecretCommand,
@@ -26,7 +25,7 @@ export class AwsProvider implements Provider {
     async configure(options: string): Promise<ProjectConfig> {
         const setup = await config.getConfigure(options);
         if (setup) {
-            const overwrite = await confirm("Setup already exists. Overwrite?");
+            const overwrite = await confirmPrompt("Setup already exists. Overwrite?");
             if (!overwrite) {
                 return setup;
             }
