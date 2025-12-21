@@ -4,6 +4,7 @@ set -euo pipefail
 REPO="Enkryptify/cli"
 BIN_NAME="ek"
 INSTALL_DIR="/usr/local/bin"
+VERSION="v0.2.0-test"   # 👈 pinned to test release
 
 echo "🔍 Detecting system..."
 
@@ -31,14 +32,7 @@ case "$ARCH" in
 esac
 
 echo "📦 Installing ek for Linux ($ARCH)"
-
-# --- Fetch latest release tag ---
-VERSION="$(curl -fsSL https://api.github.com/repos/$REPO/releases/latest | grep tag_name | cut -d '"' -f 4)"
-
-if [ -z "$VERSION" ]; then
-  echo "❌ Failed to determine latest version"
-  exit 1
-fi
+echo "🔖 Version: $VERSION"
 
 TARBALL="enkryptify_Linux_${ARCH}.tar.gz"
 URL="https://github.com/$REPO/releases/download/$VERSION/$TARBALL"
@@ -53,11 +47,9 @@ curl -fsSL "$URL" -o "$TARBALL"
 echo "📦 Extracting archive"
 tar -xzf "$TARBALL"
 
-# --- Install binary ---
 echo "🚀 Installing ek to $INSTALL_DIR"
 sudo install -m 755 ek "$INSTALL_DIR/ek"
 
-# --- Install completions ---
 echo "🔧 Installing shell completions"
 
 if [ -f "ek.bash" ]; then
