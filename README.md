@@ -637,7 +637,64 @@ The CLI automatically finds the configuration for your current project by walkin
 
 ---
 
+## Setup Required Before Using External Providers
+
+### AWS
+
+Before using the AWS provider:
+
+1. **Create AWS Access Key:**
+2. **Install AWS CLI:**
+    - Install the AWS CLI (https://aws.amazon.com/cli/)
+
+3. **Configure AWS CLI:**
+   aws configure
+    - Enter your Access Key ID
+    - Enter your Secret Access Key
+    - Enter your default region (e.g., `us-east-1`)
+
+4. **Verify Setup:**
+
+    ek login --provider aws
+    This verifies your AWS setup is correct. If successful, proceed to configure your project.
+
+5. **Configure Your Project:**
+
+    ek configure --provider aws
+
+### Google Cloud Platform (GCP)
+
+Before using the GCP provider:
+
+1. **Install Google Cloud SDK:**
+    - Install the Google Cloud SDK (https://cloud.google.com/sdk/docs/install)
+
+2. **Initialize Your Project:**
+
+    gcloud init
+    - Login and select the project you want to use for fetch and CRUD operations
+
+3. **Authenticate:**
+
+    gcloud auth application-default login 4.
+
+4. **Verify Setup:**
+   ek login --provider gcp
+   This verifies your GCP setup is correct. If successful, proceed to configure your project.
+
+5. **Configure Your Project:**
+   ek configure --provider gcp
+
+### Enkryptify
+
+No setup required. Simply run:
+
+ek login
+ek configure
+
 ## Commands
+
+**Note:** For Enkryptify, you don't need to specify `--provider` for the login and configure commands . Only use `--provider` when using other providers like AWS or GCP.
 
 ### `ek login [--provider <name>] [--force]`
 
@@ -669,7 +726,13 @@ ek configure enkryptify
 
 ### `ek run  [--env <environment>] -- <command> `
 
-Run a command with secrets injected as environment variables.
+**Provider-specific behavior for `--env`:**
+
+- **Enkryptify:** Environment name (e.g., `production`, `staging`)
+- **Google Cloud Platform:** Project ID
+- **AWS:** Secrets Manager prefix
+
+    Run a command with secrets injected as environment variables.
 
 **Options:**
 
@@ -684,6 +747,8 @@ ek run npm start
 ek run python app.py
 ek run --env production --  npm run deploy
 ek run -- pnpm run dev  # -- is optional
+ek run --env production pnpm dev run
+
 ```
 
 ### `ek list [--show]`
@@ -713,11 +778,12 @@ Create a new secret in the current environment.
 **Examples:**
 
 ```bash
-ek create DATABASE_URL "postgres://..."
 ek create API_KEY  # Will prompt for value
 ```
 
 ### `ek update <name> [--personal]`
+
+**Note:** The `--personal` option is only available for the Enkryptify provider.
 
 Update an existing secret.
 
@@ -729,11 +795,14 @@ Update an existing secret.
 
 - `--personal` - Mark as personal secret (overrides team secret)
 
+    **Note:** The `--personal` option is only available for the Enkryptify provider.
+
 **Examples:**
 
 ```bash
 ek update DATABASE_URL
 ek update API_KEY --personal
+
 ```
 
 ### `ek delete <name>`
