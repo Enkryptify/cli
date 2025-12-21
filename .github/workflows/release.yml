@@ -37,10 +37,22 @@ jobs:
                   mkdir -p dist/bin dist/archives
 
                   bun build src/cli.ts --compile --target=bun-linux-x64   --outfile=dist/bin/ek
-                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek
+
+                  # ✅ COPY COMPLETION FILES
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh  dist/bin/
+                  cp src/complete/ek.ps1  dist/bin/
+
+                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh ek.ps1
 
                   bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
-                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek
+
+                  # ✅ COPY COMPLETION FILES (again for arm64)
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh  dist/bin/
+                  cp src/complete/ek.ps1  dist/bin/
+
+                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh ek.ps1
 
                   sha256sum dist/archives/*.tar.gz > dist/archives/checksums.txt
 
