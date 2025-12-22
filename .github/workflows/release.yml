@@ -127,7 +127,7 @@ jobs:
               id: version
               run: |
                   VERSION=$(node -p "require('./package.json').version")
-                  TAG="v${VERSION}-test"
+                  TAG="v${VERSION}-test.${GITHUB_RUN_NUMBER}"
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
                   echo "tag=$TAG" >> $GITHUB_OUTPUT
 
@@ -148,13 +148,13 @@ jobs:
                     shasum -a 256 * > checksums.txt
                   fi
 
-            - name: Move test tag
+            - name: Create release tag
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
               run: |
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
-                  git tag -f ${{ steps.version.outputs.tag }}
-                  git push -f origin ${{ steps.version.outputs.tag }}
+                  git tag "${{ steps.version.outputs.tag }}"
+                  git push origin "${{ steps.version.outputs.tag }}"
 
             - name: Publish GitHub prerelease
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
@@ -162,7 +162,7 @@ jobs:
               with:
                   tag_name: ${{ steps.version.outputs.tag }}
                   prerelease: true
-                  overwrite_files: true
+                  overwrite_files: false
                   files: dist/archives/*
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
