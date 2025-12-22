@@ -41,18 +41,16 @@ jobs:
                   # ✅ COPY COMPLETION FILES
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
-                  cp src/complete/ek.ps1  dist/bin/
 
-                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh ek.ps1
+                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
 
                   bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
 
                   # ✅ COPY COMPLETION FILES (again for arm64)
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
-                  cp src/complete/ek.ps1  dist/bin/
 
-                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh ek.ps1
+                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh 
 
                   sha256sum dist/archives/*.tar.gz > dist/archives/checksums.txt
 
@@ -86,11 +84,10 @@ jobs:
                   # ✅ COPY COMPLETION FILES
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
-                  cp src/complete/ek.ps1  dist/bin/
 
                   # Package
-                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh ek.ps1
-                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh ek.ps1
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh 
 
                   shasum -a 256 dist/archives/*.tar.gz > dist/archives/checksums.txt
 
@@ -220,7 +217,6 @@ jobs:
                       bin.install "ek"
                       bash_completion.install "ek.bash" => "ek"
                       zsh_completion.install "ek.zsh" => "_ek"
-                      pkgshare.install "ek.ps1"
                     end
 
                     test do
