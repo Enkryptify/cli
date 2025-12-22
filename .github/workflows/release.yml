@@ -100,8 +100,6 @@ jobs:
         runs-on: windows-latest
         steps:
             - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
 
             - uses: oven-sh/setup-bun@v1
               with:
@@ -115,20 +113,18 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build binary
+                  # Build CLI
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
-                  # Copy PowerShell module (IN A FOLDER)
+                  # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
-                  # Package for Scoop
+                  # Zip layout MUST contain:
+                  # ek.exe
+                  # enkryptify-completion/enkryptify-completion.psm1
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
-            - uses: actions/upload-artifact@v4
-              with:
-                  name: windows
-                  path: dist/archives/*
 
     publish:
         needs: [build-linux, build-macos, build-windows]
@@ -262,10 +258,12 @@ jobs:
                     },
                     "bin": "ek.exe",
                     "psmodule": {
-                      "name": "enkryptify-completion"
+                      "name": "enkryptify-completion",
+                      "root": "enkryptify-completion"
                     }
                   }
                   EOF
+
 
                   git add enkryptify.json
                   git commit -m "Update enkryptify ${VERSION}"
