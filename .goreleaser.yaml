@@ -2,16 +2,10 @@ project_name: enkryptify
 
 builds:
     - skip: true
-      goos:
-          - linux
-          - darwin
-          - windows
-      goarch:
-          - amd64
-          - arm64
 
 archives:
-    - name_template: >-
+    - id: unix
+      name_template: >-
           {{ .ProjectName }}_
           {{- title .Os }}_
           {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
@@ -20,12 +14,19 @@ archives:
           - dist/bin/ek
           - dist/bin/ek.bash
           - dist/bin/ek.zsh
-      format_overrides:
-          - goos: windows
-            format: zip
-            files:
-                - dist/bin/ek.exe
-                - dist/bin/enkryptify-completion/**
+      goos:
+          - linux
+          - darwin
+
+    - id: windows
+      name_template: >-
+          {{ .ProjectName }}_Windows_x86_64
+      format: zip
+      files:
+          - dist/bin/ek.exe
+          - dist/bin/enkryptify-completion/**
+      goos:
+          - windows
 
 checksum:
     name_template: checksums.txt
