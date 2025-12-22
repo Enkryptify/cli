@@ -1,20 +1,12 @@
-name: Release CLI (test)
+name: Release CLI
 
 on:
-    workflow_dispatch:
-        inputs:
-            publish_release:
-                description: "Publish / update the test prerelease (v0.0.0-test)"
-                type: boolean
-                required: false
-                default: true
-
     push:
-        branches:
-            - feature/cli-0.2.0
+        tags:
+            - "v*"
 
 concurrency:
-    group: release-test
+    group: release
     cancel-in-progress: true
 
 jobs:
@@ -42,7 +34,8 @@ jobs:
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
 
-                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
+                  # Create deterministic tarball (fixed mtime, owner, group)
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
 
                   bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
 
@@ -50,7 +43,8 @@ jobs:
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
 
-                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh
+                  # Create deterministic tarball (fixed mtime, owner, group)
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh
 
             - uses: actions/upload-artifact@v4
               with:
@@ -83,9 +77,8 @@ jobs:
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
 
-                  # Package
-                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
-                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh
 
             - uses: actions/upload-artifact@v4
               with:
@@ -115,12 +108,20 @@ jobs:
                   # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
+                  # Set fixed timestamps for deterministic zip (PowerShell)
+                  $fixedDate = Get-Date "2020-01-01 00:00:00"
+                  (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
+
                   # Zip layout MUST contain:
                   # ek.exe
                   # enkryptify-completion/enkryptify-completion.psm1
+                  # Use -CompressionLevel Optimal for consistency
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
-                    -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
+                    -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
+                    -CompressionLevel Optimal
 
             - uses: actions/upload-artifact@v4
               with:
@@ -137,12 +138,14 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
+                  ref: ${{ github.ref }}
 
-            - name: Get version from package.json
+            - name: Get version from git tag
               id: version
               run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  TAG="v${VERSION}-test"
+                  # Extract version from git tag (e.g., v1.0.0 -> 1.0.0)
+                  TAG="${GITHUB_REF#refs/tags/}"
+                  VERSION="${TAG#v}"
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
                   echo "tag=$TAG" >> $GITHUB_OUTPUT
 
@@ -160,34 +163,22 @@ jobs:
                   # Sort alphabetically by filename (matching GoReleaser behavior)
                   sort checksums.txt -o checksums.txt
 
-            - name: Move test tag
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
-              run: |
-                  git config user.name  "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-                  git tag -f ${{ steps.version.outputs.tag }}
-                  git push -f origin ${{ steps.version.outputs.tag }}
-
-            - name: Publish GitHub prerelease
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+            - name: Publish GitHub release
               uses: softprops/action-gh-release@v2
               with:
                   tag_name: ${{ steps.version.outputs.tag }}
-                  prerelease: true
-                  overwrite_files: true
                   files: dist/archives/*
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Update Homebrew test tap
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+            - name: Update Homebrew tap
               env:
                   TAP_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
                   set -euo pipefail
 
-                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify-test.git
-                  cd homebrew-enkryptify-test
+                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify.git
+                  cd homebrew-enkryptify
 
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
@@ -199,9 +190,9 @@ jobs:
 
                   cat > Formula/enkryptify.rb <<EOF
                   class Enkryptify < Formula
-                    desc "Enkryptify CLI (test)"
+                    desc "Official Enkryptify CLI for injecting secrets into your codebase"
                     homepage "https://enkryptify.com"
-                    version "${VERSION}-test"
+                    version "${VERSION}"
 
                     on_macos do
                       if Hardware::CPU.arm?
@@ -220,29 +211,28 @@ jobs:
                     end
 
                     test do
-                      system "#{bin}/ek", "--help"
+                      system "#{bin}/ek", "--version"
                     end
                   end
                   EOF
 
                   git add Formula/enkryptify.rb
-                  git commit -m "Update test formula ${{ steps.version.outputs.tag }}"
+                  git commit -m "Update formula ${TAG}"
                   git push
 
-            - name: Update Scoop test bucket
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+            - name: Update Scoop bucket
               env:
                   SCOOP_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
                   set -euo pipefail
 
-                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify-test.git
-                  cd scoop-enkryptify-test
+                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify.git
+                  cd scoop-enkryptify
 
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
 
-                  VERSION="${{ steps.version.outputs.version }}-test"
+                  VERSION="${{ steps.version.outputs.version }}"
                   TAG="${{ steps.version.outputs.tag }}"
 
                   ZIP="enkryptify_Windows_x86_64.zip"
@@ -264,11 +254,13 @@ jobs:
                     "psmodule": {
                       "name": "enkryptify-completion",
                       "root": "enkryptify-completion"
-                    }
+                    },
+                    "homepage": "https://enkryptify.com",
+                    "description": "Official Enkryptify CLI for injecting secrets into your codebase",
+                    "license": "GPL-3.0-only"
                   }
                   EOF
 
-
                   git add enkryptify.json
-                  git commit -m "Update enkryptify ${VERSION}"
+                  git commit -m "Update enkryptify ${TAG}"
                   git push
