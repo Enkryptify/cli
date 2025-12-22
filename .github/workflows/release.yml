@@ -265,7 +265,7 @@ jobs:
                       "name": "enkryptify-completion",
                       "root": ".",
                       "files": [
-                        "ek.ps1"
+                        "enkryptify-completion.psm1"
                       ]
                     }
                   }
