@@ -4,7 +4,34 @@ set -euo pipefail
 REPO="Enkryptify/cli"
 BIN_NAME="ek"
 INSTALL_DIR="/usr/local/bin"
-VERSION="v0.2.0-test"
+
+# Get version from argument or use latest
+if [ $# -gt 0 ]; then
+  VERSION="$1"
+  # Add 'v' prefix if not present
+  if [[ ! "$VERSION" =~ ^v ]]; then
+    VERSION="v$VERSION"
+  fi
+  echo "📌 Using specified version: $VERSION"
+else
+  # Try to get latest release tag from GitHub (includes prereleases)
+  echo "🔍 Fetching latest version..."
+  # First try latest release (stable)
+  VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+  
+  # If no stable release, try to get latest prerelease
+  if [ -z "$VERSION" ]; then
+    echo "⚠️  No stable release found, checking for prereleases..."
+    VERSION=$(curl -s "https://api.github.com/repos/$REPO/releases" 2>/dev/null | grep '"tag_name":' | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/' || echo "")
+  fi
+  
+  if [ -z "$VERSION" ]; then
+    echo "❌ Could not fetch latest version from GitHub."
+    echo "   Please specify a version manually: $0 v0.2.0"
+    exit 1
+  fi
+  echo "📌 Using latest version: $VERSION"
+fi
 
 echo "🔍 Detecting system..."
 
