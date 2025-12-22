@@ -14,9 +14,6 @@ archives:
           - dist/bin/ek
           - dist/bin/ek.bash
           - dist/bin/ek.zsh
-      goos:
-          - linux
-          - darwin
 
     - id: windows
       name_template: >-
@@ -25,8 +22,6 @@ archives:
       files:
           - dist/bin/ek.exe
           - dist/bin/enkryptify-completion/**
-      goos:
-          - windows
 
 checksum:
     name_template: checksums.txt
