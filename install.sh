@@ -5,6 +5,30 @@ REPO="Enkryptify/cli"
 BIN_NAME="ek"
 INSTALL_DIR="/usr/local/bin"
 
+# Check if bash is available (required for this script)
+if ! command -v bash &> /dev/null; then
+    echo "❌ bash is required but not installed."
+    echo "   Please install bash first:"
+    echo "   - Debian/Ubuntu: sudo apt-get install bash"
+    echo "   - Alpine: sudo apk add bash"
+    echo "   - RedHat/CentOS: sudo yum install bash"
+    echo "   - Arch: sudo pacman -S bash"
+    exit 1
+fi
+
+# Check if required tools are available
+if ! command -v curl &> /dev/null; then
+    echo "❌ curl is required but not installed."
+    echo "   Please install curl first."
+    exit 1
+fi
+
+if ! command -v tar &> /dev/null; then
+    echo "❌ tar is required but not installed."
+    echo "   Please install tar first."
+    exit 1
+fi
+
 # Get version from argument or use latest
 if [ $# -gt 0 ]; then
   VERSION="$1"
@@ -52,6 +76,8 @@ case "$OS" in
     ;;
   *)
     echo "❌ Unsupported OS: $OS"
+    echo "   This script supports Linux and macOS (Darwin) only."
+    echo "   For Windows, please use Scoop or the PowerShell installer."
     exit 1
     ;;
 esac
@@ -66,6 +92,8 @@ case "$ARCH" in
     ;;
   *)
     echo "❌ Unsupported CPU architecture: $ARCH"
+    echo "   Supported architectures: x86_64 (amd64), arm64 (aarch64)"
+    echo "   Please install manually or open an issue to request support for $ARCH"
     exit 1
     ;;
 esac
