@@ -36,23 +36,17 @@ jobs:
                   set -euo pipefail
                   mkdir -p dist/bin dist/archives
 
-                  bun build src/cli.ts --compile --target=bun-linux-x64   --outfile=dist/bin/ek
-
-                  # ✅ COPY COMPLETION FILES
+                  bun build src/cli.ts --compile --target=bun-linux-x64 --outfile=dist/bin/ek
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
-
-                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
+                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
                   bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
-
-                  # ✅ COPY COMPLETION FILES (again for arm64)
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
+                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
-                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh 
-
-                  sha256sum dist/archives/*.tar.gz > dist/archives/checksums.txt
+                  sha256sum dist/archives/*.tar.gz > dist/archives/checksums-linux.txt
 
             - uses: actions/upload-artifact@v4
               with:
@@ -63,8 +57,6 @@ jobs:
         runs-on: macos-latest
         steps:
             - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
 
             - uses: oven-sh/setup-bun@v1
               with:
@@ -77,19 +69,16 @@ jobs:
                   set -euo pipefail
                   mkdir -p dist/bin dist/archives
 
-                  # Build binaries
-                  bun build src/cli.ts --compile --target=bun-darwin-x64   --outfile=dist/bin/ek
+                  bun build src/cli.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/ek
                   bun build src/cli.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/ek
 
-                  # ✅ COPY COMPLETION FILES
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
 
-                  # Package
-                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh 
-                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz  -C dist/bin ek ek.bash ek.zsh 
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
-                  shasum -a 256 dist/archives/*.tar.gz > dist/archives/checksums.txt
+                  shasum -a 256 dist/archives/*.tar.gz > dist/archives/checksums-macos.txt
 
             - uses: actions/upload-artifact@v4
               with:
@@ -113,18 +102,21 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build CLI
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
-
-                  # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
-                  # Zip layout MUST contain:
-                  # ek.exe
-                  # enkryptify-completion/enkryptify-completion.psm1
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
+
+                  Get-FileHash dist\archives\enkryptify_Windows_x86_64.zip -Algorithm SHA256 |
+                    ForEach-Object { "$($_.Hash.ToLower())  enkryptify_Windows_x86_64.zip" } |
+                    Out-File dist\archives\checksums-windows.txt -Encoding utf8
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: windows
+                  path: dist/archives/*
 
     publish:
         needs: [build-linux, build-macos, build-windows]
@@ -134,35 +126,23 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
 
-            - name: Get version from package.json
+            - name: Get version
               id: version
               run: |
                   VERSION=$(node -p "require('./package.json').version")
-                  TAG="v${VERSION}-test"
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+                  echo "tag=v${VERSION}-test" >> $GITHUB_OUTPUT
 
             - uses: actions/download-artifact@v4
               with:
                   path: dist/archives
                   merge-multiple: true
 
-            - name: Create combined checksums
+            - name: Merge checksums
               run: |
                   cd dist/archives
-                  rm -f checksums.txt
-                  sha256sum *.tar.gz > checksums.txt || shasum -a 256 *.tar.gz > checksums.txt
-
-            - name: Move test tag
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
-              run: |
-                  git config user.name  "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-                  git tag -f ${{ steps.version.outputs.tag }}
-                  git push -f origin ${{ steps.version.outputs.tag }}
+                  cat checksums-*.txt > checksums.txt
 
             - name: Publish GitHub prerelease
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
@@ -170,60 +150,9 @@ jobs:
               with:
                   tag_name: ${{ steps.version.outputs.tag }}
                   prerelease: true
-                  overwrite_files: true
                   files: dist/archives/*
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Update Homebrew test tap
-              if: ${{ github.event_name == 'push' || inputs.publish_release }}
-              env:
-                  TAP_TOKEN: ${{ secrets.GH_TOKEN }}
-              run: |
-                  set -euo pipefail
-
-                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify-test.git
-                  cd homebrew-enkryptify-test
-
-                  git config user.name  "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-
-                  ARM_SHA=$(grep enkryptify_Darwin_arm64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
-                  X64_SHA=$(grep enkryptify_Darwin_x86_64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
-                  VERSION="${{ steps.version.outputs.version }}"
-                  TAG="${{ steps.version.outputs.tag }}"
-
-                  cat > Formula/enkryptify.rb <<EOF
-                  class Enkryptify < Formula
-                    desc "Enkryptify CLI (test)"
-                    homepage "https://enkryptify.com"
-                    version "${VERSION}-test"
-
-                    on_macos do
-                      if Hardware::CPU.arm?
-                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_arm64.tar.gz"
-                        sha256 "${ARM_SHA}"
-                      else
-                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_x86_64.tar.gz"
-                        sha256 "${X64_SHA}"
-                      end
-                    end
-
-                    def install
-                      bin.install "ek"
-                      bash_completion.install "ek.bash" => "ek"
-                      zsh_completion.install "ek.zsh" => "_ek"
-                    end
-
-                    test do
-                      system "#{bin}/ek", "--help"
-                    end
-                  end
-                  EOF
-
-                  git add Formula/enkryptify.rb
-                  git commit -m "Update test formula ${{ steps.version.outputs.tag }}"
-                  git push
 
             - name: Update Scoop test bucket
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
@@ -231,29 +160,19 @@ jobs:
                   SCOOP_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
                   set -euo pipefail
-
                   git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify-test.git
                   cd scoop-enkryptify-test
 
-                  git config user.name  "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-
-                  VERSION="${{ steps.version.outputs.version }}-test"
-                  TAG="${{ steps.version.outputs.tag }}"
-
                   ZIP="enkryptify_Windows_x86_64.zip"
-                  URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
-
-                  # Compute SHA 
-                  SHA=$(curl -fsSL "$URL" | sha256sum | awk '{print $1}')
+                  SHA=$(grep "$ZIP" ../dist/archives/checksums.txt | awk '{print $1}')
 
                   cat > enkryptify.json <<EOF
                   {
-                    "version": "${VERSION}",
+                    "version": "${{ steps.version.outputs.version }}-test",
                     "architecture": {
                       "64bit": {
-                        "url": "${URL}",
-                        "hash": "${SHA}"
+                        "url": "https://github.com/Enkryptify/cli/releases/download/${{ steps.version.outputs.tag }}/$ZIP",
+                        "hash": "$SHA"
                       }
                     },
                     "bin": "ek.exe",
@@ -264,7 +183,6 @@ jobs:
                   }
                   EOF
 
-
                   git add enkryptify.json
-                  git commit -m "Update enkryptify ${VERSION}"
+                  git commit -m "Update enkryptify ${{ steps.version.outputs.version }}-test"
                   git push
