@@ -1,0 +1,58 @@
+project_name: enkryptify
+
+builds:
+    - skip: true
+      goos:
+          - linux
+          - darwin
+          - windows
+      goarch:
+          - amd64
+          - arm64
+
+archives:
+    - name_template: >-
+          {{ .ProjectName }}_
+          {{- title .Os }}_
+          {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+      format: tar.gz
+      files:
+          - dist/bin/ek
+          - dist/bin/ek.bash
+          - dist/bin/ek.zsh
+      format_overrides:
+          - goos: windows
+            format: zip
+            files:
+                - dist/bin/ek.exe
+                - dist/bin/enkryptify-completion/**
+
+checksum:
+    name_template: checksums.txt
+    algorithm: sha256
+
+release:
+    prerelease: true
+
+brews:
+    - name: enkryptify
+      repository:
+          owner: Enkryptify
+          name: homebrew-enkryptify-test
+      commit_author:
+          name: Enkryptify Bot
+          email: bot@enkryptify.com
+      homepage: https://enkryptify.com
+      description: Enkryptify CLI (test)
+      install: |
+          bin.install "ek"
+          bash_completion.install "ek.bash" => "ek"
+          zsh_completion.install "ek.zsh" => "_ek"
+
+scoops:
+    - repository:
+          owner: Enkryptify
+          name: scoop-enkryptify-test
+      commit_author:
+          name: Enkryptify Bot
+          email: bot@enkryptify.com
