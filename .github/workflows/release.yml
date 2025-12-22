@@ -99,8 +99,43 @@ jobs:
                   name: macos
                   path: dist/archives/*
 
+    build-windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+
+            - run: bun install
+
+            - name: Build Windows
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force dist\bin | Out-Null
+                  New-Item -ItemType Directory -Force dist\archives | Out-Null
+
+                  # Build Windows x64 binary
+                  bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
+
+                  # Copy PowerShell completion
+                  Copy-Item src\complete\ek.ps1 dist\bin\ek.ps1
+
+                  # Package for Scoop
+                  Compress-Archive `
+                    -Path dist\bin\ek.exe, dist\bin\ek.ps1 `
+                    -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: windows
+                  path: dist/archives/*
+
     publish:
-        needs: [build-linux, build-macos]
+        needs: [build-linux, build-macos, build-windows]
         runs-on: ubuntu-latest
         permissions:
             contents: write
