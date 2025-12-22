@@ -112,18 +112,18 @@ jobs:
             - name: Build Windows
               shell: pwsh
               run: |
-                  New-Item -ItemType Directory -Force dist\bin | Out-Null
+                  New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build Windows x64 binary
+                  # Build binary
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
-                  # Copy PowerShell completion
-                  Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\
+                  # Copy PowerShell module (IN A FOLDER)
+                  Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
                   # Package for Scoop
                   Compress-Archive `
-                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion.psm1 `
+                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
             - uses: actions/upload-artifact@v4
               with:
