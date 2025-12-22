@@ -177,8 +177,8 @@ jobs:
               run: |
                   set -euo pipefail
 
-                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify.git
-                  cd homebrew-enkryptify
+                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify-test.git
+                  cd homebrew-enkryptify-test
 
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
@@ -226,8 +226,8 @@ jobs:
               run: |
                   set -euo pipefail
 
-                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify.git
-                  cd scoop-enkryptify
+                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify-test.git
+                  cd scoop-enkryptify-test
 
                   git config user.name  "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
