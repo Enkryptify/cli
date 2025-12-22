@@ -2,6 +2,13 @@ name: Release CLI (test)
 
 on:
     workflow_dispatch:
+        inputs:
+            publish_release:
+                description: "Publish / update the test prerelease (v0.0.0-test)"
+                type: boolean
+                required: false
+                default: true
+
     push:
         branches:
             - feature/cli-0.2.0
@@ -11,31 +18,12 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    build:
-        name: Build (${{ matrix.name }})
-        runs-on: ${{ matrix.runner }}
-        strategy:
-            fail-fast: true
-            matrix:
-                include:
-                    - name: linux-x64
-                      runner: ubuntu-latest
-                      target: bun-linux-x64
-                    - name: linux-arm64
-                      runner: ubuntu-latest
-                      target: bun-linux-arm64
-                    - name: macos-x64
-                      runner: macos-latest
-                      target: bun-darwin-x64
-                    - name: macos-arm64
-                      runner: macos-latest
-                      target: bun-darwin-arm64
-                    - name: windows-x64
-                      runner: windows-latest
-                      target: bun-windows-x64
-
+    build-linux:
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
 
             - uses: oven-sh/setup-bun@v1
               with:
@@ -43,57 +31,96 @@ jobs:
 
             - run: bun install
 
-            - name: Build & package
-              shell: bash
+            - name: Build Linux
               run: |
                   set -euo pipefail
                   mkdir -p dist/bin dist/archives
 
-                  VERSION=$(node -p "require('./package.json').version")
+                  bun build src/cli.ts --compile --target=bun-linux-x64 --outfile=dist/bin/ek
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh dist/bin/
+                  tar -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
-                  if [[ "${{ matrix.name }}" == windows-x64 ]]; then
-                    bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile=dist/bin/ek.exe
-
-                    mkdir -p dist/bin/enkryptify-completion
-                    cp src/complete/enkryptify-completion.psm1 dist/bin/enkryptify-completion/
-
-                    (cd dist/bin && zip -r ../archives/enkryptify_Windows_x86_64.zip ek.exe enkryptify-completion)
-                  else
-                    bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile=dist/bin/ek
-                    cp src/complete/ek.bash dist/bin/
-                    cp src/complete/ek.zsh dist/bin/
-
-                    OS=$(echo "${{ matrix.name }}" | cut -d- -f1 | tr '[:lower:]' '[:upper:]')
-                    ARCH=$(echo "${{ matrix.name }}" | cut -d- -f2)
-
-                    tar -czf dist/archives/enkryptify_${OS}_${ARCH}.tar.gz \
-                      -C dist/bin ek ek.bash ek.zsh
-                  fi
+                  bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh dist/bin/
+                  tar -czf dist/archives/enkryptify_Linux_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
             - uses: actions/upload-artifact@v4
               with:
-                  name: ${{ matrix.name }}
+                  name: linux
+                  path: dist/archives/*
+
+    build-macos:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+
+            - run: bun install
+
+            - name: Build macOS
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist/bin dist/archives
+
+                  bun build src/cli.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/ek
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh dist/bin/
+                  tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+                  bun build src/cli.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/ek
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh dist/bin/
+                  tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: macos
+                  path: dist/archives/*
+
+    build-windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+            - run: bun install
+
+            - name: Build Windows
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
+                  New-Item -ItemType Directory -Force dist\archives | Out-Null
+
+                  bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
+                  Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
+
+                  Compress-Archive `
+                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
+                    -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: windows
                   path: dist/archives/*
 
     publish:
-        needs: build
+        needs: [build-linux, build-macos, build-windows]
         runs-on: ubuntu-latest
         permissions:
             contents: write
 
         steps:
             - uses: actions/checkout@v4
-
-            - name: Download artifacts
-              uses: actions/download-artifact@v4
               with:
-                  path: dist/archives
-                  merge-multiple: true
-
-            - name: Compute checksums (single source of truth)
-              run: |
-                  cd dist/archives
-                  sha256sum *.tar.gz *.zip > checksums.txt
+                  fetch-depth: 0
 
             - name: Get version
               id: version
@@ -103,12 +130,15 @@ jobs:
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
                   echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-            - name: Move test tag
+            - uses: actions/download-artifact@v4
+              with:
+                  path: dist/archives
+                  merge-multiple: true
+
+            - name: Generate checksums (ONCE)
               run: |
-                  git config user.name "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-                  git tag -f ${{ steps.version.outputs.tag }}
-                  git push -f origin ${{ steps.version.outputs.tag }}
+                  cd dist/archives
+                  sha256sum *.tar.gz *.zip > checksums.txt
 
             - name: Publish GitHub prerelease
               uses: softprops/action-gh-release@v2
@@ -120,69 +150,22 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Update Homebrew test tap
-              env:
-                  TAP_TOKEN: ${{ secrets.GH_TOKEN }}
-              run: |
-                  set -euo pipefail
-
-                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify-test.git
-                  cd homebrew-enkryptify-test
-
-                  git config user.name "Enkryptify Bot"
-                  git config user.email "bot@enkryptify.com"
-
-                  ARM_SHA=$(grep enkryptify_MACOS_arm64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
-                  X64_SHA=$(grep enkryptify_MACOS_x64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
-
-                  VERSION="${{ steps.version.outputs.version }}"
-                  TAG="${{ steps.version.outputs.tag }}"
-
-                  cat > Formula/enkryptify.rb <<EOF
-                  class Enkryptify < Formula
-                    desc "Enkryptify CLI (test)"
-                    homepage "https://enkryptify.com"
-                    version "${VERSION}-test"
-
-                    on_macos do
-                      if Hardware::CPU.arm?
-                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_MACOS_arm64.tar.gz"
-                        sha256 "${ARM_SHA}"
-                      else
-                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_MACOS_x64.tar.gz"
-                        sha256 "${X64_SHA}"
-                      end
-                    end
-
-                    def install
-                      bin.install "ek"
-                      bash_completion.install "ek.bash" => "ek"
-                      zsh_completion.install "ek.zsh" => "_ek"
-                    end
-                  end
-                  EOF
-
-                  git add Formula/enkryptify.rb
-                  git commit -m "Update enkryptify ${VERSION}-test"
-                  git push
-
             - name: Update Scoop test bucket
               env:
                   SCOOP_TOKEN: ${{ secrets.GH_TOKEN }}
               run: |
                   set -euo pipefail
-
                   git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify-test.git
                   cd scoop-enkryptify-test
 
                   git config user.name "Enkryptify Bot"
                   git config user.email "bot@enkryptify.com"
 
-                  ZIP="enkryptify_Windows_x86_64.zip"
-                  SHA=$(grep "$ZIP" ../dist/archives/checksums.txt | awk '{print $1}')
-
                   VERSION="${{ steps.version.outputs.version }}-test"
                   TAG="${{ steps.version.outputs.tag }}"
+                  ZIP="enkryptify_Windows_x86_64.zip"
+
+                  SHA=$(grep "$ZIP" ../dist/archives/checksums.txt | awk '{print $1}')
 
                   cat > enkryptify.json <<EOF
                   {
