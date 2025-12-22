@@ -233,3 +233,40 @@ jobs:
                   git add Formula/enkryptify.rb
                   git commit -m "Update test formula ${{ steps.version.outputs.tag }}"
                   git push
+
+            - name: Update Scoop test bucket
+              if: ${{ github.event_name == 'push' || inputs.publish_release }}
+              env:
+                  SCOOP_TOKEN: ${{ secrets.GH_TOKEN }}
+              run: |
+                  set -euo pipefail
+
+                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify-test.git
+                  cd scoop-enkryptify-test
+
+                  git config user.name  "Enkryptify Bot"
+                  git config user.email "bot@enkryptify.com"
+
+                  VERSION="${{ steps.version.outputs.version }}-test"
+                  TAG="${{ steps.version.outputs.tag }}"
+
+                  ZIP="enkryptify_Windows_x86_64.zip"
+                  URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
+                  SHA=$(curl -fsSL "$URL" | sha256sum | awk '{print $1}')
+
+                  cat > enkryptify.json <<EOF
+                  {
+                    "version": "${VERSION}",
+                    "architecture": {
+                      "64bit": {
+                        "url": "${URL}",
+                        "hash": "${SHA}"
+                      }
+                    },
+                    "bin": "ek.exe"
+                  }
+                  EOF
+
+                  git add enkryptify.json
+                  git commit -m "Update enkryptify ${VERSION}"
+                  git push
