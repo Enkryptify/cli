@@ -262,11 +262,7 @@ jobs:
                     },
                     "bin": "ek.exe",
                     "psmodule": {
-                      "name": "enkryptify-completion",
-                      "root": ".",
-                      "files": [
-                        "enkryptify-completion.psm1"
-                      ]
+                      "name": "enkryptify-completion"
                     }
                   }
                   EOF
