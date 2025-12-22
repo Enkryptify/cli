@@ -4,23 +4,56 @@ builds:
     - skip: true
 
 archives:
-    - id: unix
-      name_template: >-
-          {{ .ProjectName }}_
-          {{- title .Os }}_
-          {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+    # macOS AMD64
+    - id: darwin_amd64
+      name_template: "{{ .ProjectName }}_Darwin_x86_64"
       format: tar.gz
       files:
-          - dist/bin/ek
+          - dist/bin/darwin_amd64/ek
           - dist/bin/ek.bash
           - dist/bin/ek.zsh
 
-    - id: windows
-      name_template: >-
-          {{ .ProjectName }}_Windows_x86_64
+    # macOS ARM64
+    - id: darwin_arm64
+      name_template: "{{ .ProjectName }}_Darwin_arm64"
+      format: tar.gz
+      files:
+          - dist/bin/darwin_arm64/ek
+          - dist/bin/ek.bash
+          - dist/bin/ek.zsh
+
+    # Linux AMD64
+    - id: linux_amd64
+      name_template: "{{ .ProjectName }}_Linux_x86_64"
+      format: tar.gz
+      files:
+          - dist/bin/linux_amd64/ek
+          - dist/bin/ek.bash
+          - dist/bin/ek.zsh
+
+    # Linux ARM64
+    - id: linux_arm64
+      name_template: "{{ .ProjectName }}_Linux_arm64"
+      format: tar.gz
+      files:
+          - dist/bin/linux_arm64/ek
+          - dist/bin/ek.bash
+          - dist/bin/ek.zsh
+
+    # Windows AMD64
+    - id: windows_amd64
+      name_template: "{{ .ProjectName }}_Windows_x86_64"
       format: zip
       files:
-          - dist/bin/ek.exe
+          - dist/bin/windows_amd64/ek.exe
+          - dist/bin/enkryptify-completion/**
+
+    # Windows ARM64
+    - id: windows_arm64
+      name_template: "{{ .ProjectName }}_Windows_arm64"
+      format: zip
+      files:
+          - dist/bin/windows_arm64/ek.exe
           - dist/bin/enkryptify-completion/**
 
 checksum:
@@ -32,6 +65,11 @@ release:
 
 brews:
     - name: enkryptify
+      ids:
+          - darwin_amd64
+          - darwin_arm64
+          - linux_amd64
+          - linux_arm64
       repository:
           owner: Enkryptify
           name: homebrew-enkryptify-test
