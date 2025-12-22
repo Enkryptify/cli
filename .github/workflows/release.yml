@@ -119,11 +119,11 @@ jobs:
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
                   # Copy PowerShell completion
-                  Copy-Item src\complete\EnkryptifyCompletion.psm1 dist\bin\
+                  Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\
 
                   # Package for Scoop
                   Compress-Archive `
-                    -Path dist\bin\ek.exe, dist\bin\EnkryptifyCompletion.psm1 `
+                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion.psm1 `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip
             - uses: actions/upload-artifact@v4
               with:
