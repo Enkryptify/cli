@@ -163,7 +163,7 @@ jobs:
               run: |
                   cd dist/archives
                   rm -f checksums.txt
-                  sha256sum *.tar.gz > checksums.txt || shasum -a 256 *.tar.gz > checksums.txt
+                  sha256sum *.tar.gz *.zip > checksums.txt || shasum -a 256 *.tar.gz *.zip > checksums.txt
 
             - name: Move test tag
               if: ${{ github.event_name == 'push' || inputs.publish_release }}
@@ -253,8 +253,8 @@ jobs:
                   ZIP="enkryptify_Windows_x86_64.zip"
                   URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
 
-                  # Get SHA from checksums.txt (more reliable than downloading)
-                  SHA=$(grep "$ZIP" ../dist/archives/checksums.txt | awk '{print $1}' || curl -fsSL "$URL" | sha256sum | awk '{print $1}')
+                  # Get SHA from checksums.txt (same as Mac/Linux)
+                  SHA=$(grep "$ZIP" ../dist/archives/checksums.txt | awk '{print $1}')
 
                   cat > enkryptify.json <<EOF
                   {
