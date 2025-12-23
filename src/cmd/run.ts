@@ -8,7 +8,7 @@ import type { Command } from "commander";
 export async function runCommand(
     projectconfig: ProjectConfig,
     cmd: string[],
-    options?: { env?: string },
+    options?: { env?: string; unmountSpinner?: () => void },
 ): Promise<void> {
     const provider = providerRegistry.get(projectconfig.provider);
     if (!provider) {
@@ -21,6 +21,11 @@ export async function runCommand(
 
     const secrets = await provider.run(projectconfig, { env: options?.env });
     const env = buildEnvWithSecrets(secrets);
+
+    // Unmount spinner right after secrets are fetched, before command runs
+    if (options?.unmountSpinner) {
+        options.unmountSpinner();
+    }
 
     if (cmd.length === 0) {
         throw new Error("Command is required. Please provide a command to run.");
@@ -60,8 +65,11 @@ export function registerRunCommand(program: Command) {
 
                 await RunFlow({
                     envName: opts.env,
-                    run: async () => {
-                        await runCommand(projectConfig, cmd, opts);
+                    run: async (unmountSpinner) => {
+                        await runCommand(projectConfig, cmd, {
+                            ...opts,
+                            unmountSpinner,
+                        });
                     },
                 });
             } catch (error) {

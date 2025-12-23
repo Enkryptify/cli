@@ -3,7 +3,7 @@ import Spinner from "ink-spinner";
 
 export interface RunFlowProps {
     envName?: string;
-    run: () => Promise<void>;
+    run: (unmountSpinner: () => void) => Promise<void>;
 }
 
 function SpinnerComponent({ message }: { message: string }) {
@@ -24,17 +24,18 @@ export async function RunFlow({ envName, run }: RunFlowProps): Promise<void> {
         stdout: process.stderr,
     });
 
-    try {
-        await run();
+    const unmountSpinner = () => spinner.unmount();
 
-        spinner.unmount();
+    try {
+        await run(unmountSpinner);
+
         const successMessage = envName
             ? `Secrets injected successfully for environment "${envName}".\n`
             : "Secrets injected successfully.\n";
+
         process.stderr.write(successMessage);
     } catch (error) {
         spinner.unmount();
-        // Re-throw error - let command handler log it
         throw error;
     }
 }
