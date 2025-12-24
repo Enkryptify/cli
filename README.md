@@ -781,9 +781,9 @@ Create a new secret in the current environment.
 ek create API_KEY  # Will prompt for value
 ```
 
-### `ek update <name> [--personal]`
+### `ek update <name> [--ispersonal]`
 
-**Note:** The `--personal` option is only available for the Enkryptify provider.
+**Note:** The `--ispersonal` option is only available for the Enkryptify provider.
 
 Update an existing secret.
 
@@ -793,15 +793,15 @@ Update an existing secret.
 
 **Options:**
 
-- `--personal` - Mark as personal secret (overrides team secret)
+- `--ispersonal` - Mark as personal secret (overrides team secret)
 
-    **Note:** The `--personal` option is only available for the Enkryptify provider.
+    **Note:** The `--ispersonal` option is only available for the Enkryptify provider.
 
 **Examples:**
 
 ```bash
 ek update DATABASE_URL
-ek update API_KEY --personal
+ek update API_KEY --ispersonal
 
 ```
 
