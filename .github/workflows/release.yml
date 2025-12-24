@@ -109,7 +109,7 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build CLI
+                  # Build x64 CLI
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
                   # Copy PowerShell module INTO A FOLDER
@@ -128,6 +128,20 @@ jobs:
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
+                    -CompressionLevel Optimal
+
+                  # Build arm64 CLI
+                  bun build src/cli.ts --compile --target=bun-windows-arm64 --outfile=dist\bin\ek.exe
+
+                  # Set fixed timestamps for deterministic zip (PowerShell)
+                  (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
+
+                  # Create arm64 zip
+                  Compress-Archive `
+                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
+                    -DestinationPath dist\archives\enkryptify_Windows_arm64.zip `
                     -CompressionLevel Optimal
 
             - uses: actions/upload-artifact@v4
@@ -242,19 +256,26 @@ jobs:
                   VERSION="${{ steps.version.outputs.version }}"
                   TAG="${{ steps.version.outputs.tag }}"
 
-                  ZIP="enkryptify_Windows_x86_64.zip"
-                  URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
+                  ZIP_X64="enkryptify_Windows_x86_64.zip"
+                  ZIP_ARM64="enkryptify_Windows_arm64.zip"
+                  URL_X64="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP_X64}"
+                  URL_ARM64="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP_ARM64}"
 
                   # Get SHA from checksums.txt (more reliable than downloading)
-                  SHA=$(grep "${ZIP}" ../dist/archives/checksums.txt | awk '{print $1}')
+                  SHA_X64=$(grep "${ZIP_X64}" ../dist/archives/checksums.txt | awk '{print $1}')
+                  SHA_ARM64=$(grep "${ZIP_ARM64}" ../dist/archives/checksums.txt | awk '{print $1}')
 
                   cat > enkryptify.json <<EOF
                   {
                     "version": "${VERSION}",
                     "architecture": {
                       "64bit": {
-                        "url": "${URL}",
-                        "hash": "${SHA}"
+                        "url": "${URL_X64}",
+                        "hash": "${SHA_X64}"
+                      },
+                      "arm64": {
+                        "url": "${URL_ARM64}",
+                        "hash": "${SHA_ARM64}"
                       }
                     },
                     "bin": "ek.exe",
