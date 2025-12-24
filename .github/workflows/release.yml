@@ -109,36 +109,30 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build x64 CLI
+                  # -------------------------
+                  # Windows x64
+                  # -------------------------
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
-                  # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
-                  # Set fixed timestamps for deterministic zip (PowerShell)
                   $fixedDate = Get-Date "2020-01-01 00:00:00"
                   (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
 
-                  # Zip layout MUST contain:
-                  # ek.exe
-                  # enkryptify-completion/enkryptify-completion.psm1
-                  # Use -CompressionLevel Optimal for consistency
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
                     -CompressionLevel Optimal
 
-                  # Build arm64 CLI
+                  # -------------------------
+                  # Windows ARM64 
+                  # -------------------------
                   bun build src/cli.ts --compile --target=bun-windows-arm64 --outfile=dist\bin\ek.exe
 
-                  # Set fixed timestamps for deterministic zip (PowerShell)
                   (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
-                  (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
-                  (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
 
-                  # Create arm64 zip
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_arm64.zip `
@@ -256,26 +250,19 @@ jobs:
                   VERSION="${{ steps.version.outputs.version }}"
                   TAG="${{ steps.version.outputs.tag }}"
 
-                  ZIP_X64="enkryptify_Windows_x86_64.zip"
-                  ZIP_ARM64="enkryptify_Windows_arm64.zip"
-                  URL_X64="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP_X64}"
-                  URL_ARM64="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP_ARM64}"
+                  ZIP="enkryptify_Windows_x86_64.zip"
+                  URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
 
                   # Get SHA from checksums.txt (more reliable than downloading)
-                  SHA_X64=$(grep "${ZIP_X64}" ../dist/archives/checksums.txt | awk '{print $1}')
-                  SHA_ARM64=$(grep "${ZIP_ARM64}" ../dist/archives/checksums.txt | awk '{print $1}')
+                  SHA=$(grep "${ZIP}" ../dist/archives/checksums.txt | awk '{print $1}')
 
                   cat > enkryptify.json <<EOF
                   {
                     "version": "${VERSION}",
                     "architecture": {
                       "64bit": {
-                        "url": "${URL_X64}",
-                        "hash": "${SHA_X64}"
-                      },
-                      "arm64": {
-                        "url": "${URL_ARM64}",
-                        "hash": "${SHA_ARM64}"
+                        "url": "${URL}",
+                        "hash": "${SHA}"
                       }
                     },
                     "bin": "ek.exe",
