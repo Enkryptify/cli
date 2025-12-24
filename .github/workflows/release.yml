@@ -109,33 +109,25 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # -------------------------
-                  # Windows x64
-                  # -------------------------
+                  # Build CLI
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
+                  # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
+                  # Set fixed timestamps for deterministic zip (PowerShell)
                   $fixedDate = Get-Date "2020-01-01 00:00:00"
                   (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
 
+                  # Zip layout MUST contain:
+                  # ek.exe
+                  # enkryptify-completion/enkryptify-completion.psm1
+                  # Use -CompressionLevel Optimal for consistency
                   Compress-Archive `
                     -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
-                    -CompressionLevel Optimal
-
-                  # -------------------------
-                  # Windows ARM64 
-                  # -------------------------
-                  bun build src/cli.ts --compile --target=bun-windows-arm64 --outfile=dist\bin\ek.exe
-
-                  (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
-
-                  Compress-Archive `
-                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
-                    -DestinationPath dist\archives\enkryptify_Windows_arm64.zip `
                     -CompressionLevel Optimal
 
             - uses: actions/upload-artifact@v4
