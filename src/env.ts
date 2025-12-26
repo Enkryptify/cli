@@ -1,11 +1,12 @@
 import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
+import pkg from "../package.json" assert { type: "json" };
 
 const defaults = {
     API_BASE_URL: "https://api.enkryptify.com",
     APP_BASE_URL: "https://app.enkryptify.com",
     GCP_RESOURCE_MANAGER_API: "https://cloudresourcemanager.googleapis.com/v1",
-    CLI_VERSION: process.env.CLI_VERSION ?? "0.2.0",
+    CLI_VERSION: process.env.CLI_VERSION ?? (pkg as { version: string }).version,
 };
 
 const runtimeEnv = {

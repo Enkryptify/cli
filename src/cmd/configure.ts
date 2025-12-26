@@ -28,7 +28,7 @@ export async function configure(providerName: string | undefined): Promise<void>
     const providerConfig = await config.getProvider(finalProviderName);
     if (!providerConfig) {
         throw new Error(
-            `Provider "${finalProviderName}" is not configured. Please run "ek login ${finalProviderName}" first.`,
+            `Provider "${finalProviderName}" is not configured. Please run "ek login --provider ${finalProviderName}" first.`,
         );
     }
 

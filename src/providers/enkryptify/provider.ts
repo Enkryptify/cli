@@ -184,7 +184,9 @@ export class EnkryptifyProvider implements Provider {
             `/v1/workspace/${workspace_slug}/project/${project_slug}/environment`,
         );
         if (environments.length === 0) {
-            throw new Error(`No environments found in project "${project_slug}". Please create an environment`);
+            throw new Error(
+                `No environments found in project "${project_slug}". You can create an environment in the project settings`,
+            );
         }
 
         const targetEnvKey = options?.env ?? environment_id;
@@ -276,7 +278,7 @@ export class EnkryptifyProvider implements Provider {
         const namePattern = /^[A-Za-z0-9_-]+$/;
         if (!namePattern.test(newName)) {
             throw new Error(
-                `Invalid secret name "${newName}". Name can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-).`,
+                `Invalid secret name "${newName}". Name can only contain A-Z, a-z, 0-9, underscore (_) and hyphen (-).`,
             );
         }
 
@@ -375,7 +377,7 @@ export class EnkryptifyProvider implements Provider {
         const { workspace_slug, project_slug, environment_id } = config;
         if (!workspace_slug || !project_slug || !environment_id) {
             throw new Error(
-                "Invalid config: missing workspace_slug, project_slug, or environment_id pls run ek setup first",
+                "Invalid config: missing workspace_slug, project_slug, or environment_id pls run ek setup or ek configure first",
             );
         }
         return { workspace_slug, project_slug, environment_id };

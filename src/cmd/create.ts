@@ -9,7 +9,7 @@ export async function createSecretCommand(name: string, value: string): Promise<
     const namePattern = /^[A-Za-z0-9_-]+$/;
     if (!namePattern.test(name)) {
         throw new Error(
-            `Invalid secret name "${name}". Name can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-).`,
+            `Invalid secret name "${name}". Name can only contain A-Z, a-z, 0-9, underscore (_) and hyphen (-).`,
         );
     }
 
@@ -37,7 +37,7 @@ export function registerCreateCommand(program: Command) {
     program
         .command("create")
         .description("Create a new secret in the current environment")
-        .argument("<name>", "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), and hyphen (-)")
+        .argument("<name>", "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), hyphen (-)")
         .argument(
             "[value]",
             'Secret value. Use quotes for values with spaces or special characters. Example: ek create <name> "my value!@#$%^&*()"',

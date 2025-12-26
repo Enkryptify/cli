@@ -78,10 +78,9 @@ export async function loadConfig(): Promise<ConfigFile> {
 
             if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
                 exitWithError(
-                    `Configuration file must be a JSON object:\n"${CONFIG_FILE}"\n\n` +
-                        `Found: ${Array.isArray(parsed) ? "array" : parsed === null ? "null" : typeof parsed}\n` +
-                        `Expected: { "setups": {}, "providers": {} }\n` +
-                        `Fix: Delete the file or edit it manually.`,
+                    `Your configuration file is corrupted.\n\n` +
+                        `Fix: delete it to reset your configuration:\n` +
+                        `  rm -f ~/.enkryptify/config.json`,
                 );
             }
 
@@ -110,8 +109,7 @@ export async function loadConfig(): Promise<ConfigFile> {
         } catch (parseErr: unknown) {
             exitWithError(
                 `Configuration file contains invalid JSON:\n"${CONFIG_FILE}"\n\n` +
-                    `Error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\n` +
-                    `Please fix the file or delete it to start fresh.`,
+                    `Error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}\n`,
             );
         }
     } catch (err: unknown) {
@@ -121,13 +119,13 @@ export async function loadConfig(): Promise<ConfigFile> {
 
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
-                `Permission denied reading configuration file:\n"${CONFIG_FILE}"\n\n` +
-                    `Please check file permissions.`,
+                `Cannot read configuration file:\n"${CONFIG_FILE}"\n\n` +
+                    `Permission denied (EACCES). Check file permissions (chmod/chown).`,
             );
         }
 
         const errorMessage = err instanceof Error ? err.message : String(err);
-        exitWithError(`Cannot access configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${errorMessage}`);
+        exitWithError(`Cannot access configuration file ` + `because: ${errorMessage}`);
     }
 }
 
@@ -141,8 +139,8 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
     } catch (err: unknown) {
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
-                `Permission denied writing configuration file:\n"${CONFIG_FILE}"\n\n` +
-                    `Please check file and directory permissions.`,
+                `Cannot write configuration file:\n"${CONFIG_FILE}"\n\n` +
+                    `Permission denied (EACCES). Check directory/file permissions (chmod/chown).`,
             );
         }
 
@@ -154,7 +152,7 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
         }
 
         const errorMessage = err instanceof Error ? err.message : String(err);
-        exitWithError(`Cannot save configuration file:\n"${CONFIG_FILE}"\n\n` + `Reason: ${errorMessage}`);
+        exitWithError(`Cannot save configuration file` + `because: ${errorMessage}`);
     }
 }
 
@@ -215,7 +213,7 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
     }
 
     throw new Error(
-        "No project configuration found. Please run 'ek configure <provider>' to set up your project first.",
+        "No project configuration found. Please run 'ek configure or ek setup --provider ' to set up your project first.",
     );
 }
 

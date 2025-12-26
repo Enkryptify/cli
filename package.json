@@ -34,7 +34,6 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@1password/sdk": "^0.3.1",
     "@aws-sdk/client-secrets-manager": "^3.950.0",
     "@aws-sdk/client-sso-oidc": "^3.946.0",
     "@aws-sdk/client-sts": "^3.948.0",
