@@ -3,15 +3,23 @@ import { logError } from "@/lib/error";
 import { getSecureInput } from "@/lib/input";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import { showMessage } from "@/ui/SuccessMessage";
+import { type CreateSecretInput, createSecretSchema } from "@/validators/secret";
 import type { Command } from "commander";
+import { z } from "zod";
 
 export async function createSecretCommand(name: string, value: string): Promise<void> {
-    const namePattern = /^[A-Za-z0-9_-]+$/;
-    if (!namePattern.test(name)) {
-        throw new Error(
-            `Invalid secret name "${name}". Name can only contain A-Z, a-z, 0-9, underscore (_) and hyphen (-).`,
-        );
+    let input: CreateSecretInput;
+
+    try {
+        input = createSecretSchema.parse({ name, value });
+    } catch (err: unknown) {
+        if (err instanceof z.ZodError) {
+            throw new Error(err.issues.map((i) => i.message).join("\n"));
+        }
+        throw err;
     }
+
+    const { name: validName, value: validValue } = input;
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
@@ -24,13 +32,9 @@ export async function createSecretCommand(name: string, value: string): Promise<
         throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
     }
 
-    if (!value || value.trim().length === 0) {
-        throw new Error("Secret value cannot be empty.");
-    }
+    await provider.createSecret(projectConfig, validName, validValue);
 
-    await provider.createSecret(projectConfig, name, value);
-
-    showMessage(`Secret created successfully! Name: ${name}`);
+    showMessage(`Secret created successfully! Name: ${validName}`);
 }
 
 export function registerCreateCommand(program: Command) {
@@ -44,17 +48,15 @@ export function registerCreateCommand(program: Command) {
         )
         .action(async (name: string, value?: string) => {
             try {
-                let secretValue = value;
-                if (!secretValue || secretValue.trim().length === 0) {
+                let secretValue = value ?? "";
+
+                if (!secretValue.trim()) {
                     secretValue = await getSecureInput("Enter secret value: ");
-                    if (!secretValue || secretValue.trim().length === 0) {
-                        throw new Error("Secret value cannot be empty. please provide a value.");
-                    }
                 }
+
                 await createSecretCommand(name, secretValue);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+            } catch (error: unknown) {
+                logError(error instanceof Error ? error.message : String(error));
                 process.exit(1);
             }
         });

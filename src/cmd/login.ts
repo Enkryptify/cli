@@ -2,6 +2,13 @@ import { logError } from "@/lib/error";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import { LoginFlow } from "@/ui/LoginFlow";
 import type { Command } from "commander";
+import { z } from "zod";
+
+const providerOptionSchema = z
+    .string()
+    .trim()
+    .min(1, { message: "Provider name cannot be empty." })
+    .transform((v) => v.toLowerCase());
 
 export function registerLoginCommand(program: Command) {
     program
@@ -11,7 +18,19 @@ export function registerLoginCommand(program: Command) {
         .option("-f, --force", "Force re-authentication even if already logged in")
         .action(async (options: { provider?: string; force?: boolean }) => {
             const fallbackProviderName = "enkryptify";
-            const providerName = options.provider || fallbackProviderName;
+
+            let providerName = fallbackProviderName;
+            if (typeof options.provider === "string") {
+                try {
+                    providerName = providerOptionSchema.parse(options.provider);
+                } catch (err: unknown) {
+                    if (err instanceof z.ZodError) {
+                        logError(err.issues.map((i) => i.message).join("\n"));
+                        process.exit(1);
+                    }
+                    throw err;
+                }
+            }
 
             const providerInstance = providerRegistry.get(providerName);
 
@@ -28,12 +47,13 @@ export function registerLoginCommand(program: Command) {
                     );
                 } else {
                     logError(
-                        `Provider "${providerName}" not found. Available providers: ${availableProviders || "none"}`,
+                        `Provider "${options.provider}" not found. Available providers: ${availableProviders || "none"}`,
                     );
                 }
 
                 process.exit(1);
             }
+
             await LoginFlow({
                 provider: providerInstance,
                 options: {
@@ -41,8 +61,7 @@ export function registerLoginCommand(program: Command) {
                     force: options.force,
                 },
                 onError: (error: Error) => {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    logError(errorMessage);
+                    logError(error instanceof Error ? error.message : String(error));
                     process.exit(1);
                 },
             });

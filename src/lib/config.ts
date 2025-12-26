@@ -42,9 +42,17 @@ async function createDefaultConfig(): Promise<ConfigFile> {
 
         let additionalInfo = "";
         if (errorCode === "EACCES") {
-            additionalInfo =
-                `\nThe directory "${path.dirname(CONFIG_FILE)}" exists but you don't have write permissions.\n` +
-                `Try running: chmod 755 "${path.dirname(CONFIG_FILE)}"`;
+            if (process.platform === "win32") {
+                additionalInfo =
+                    `\nThe directory "${path.dirname(CONFIG_FILE)}" exists but you don't have write permissions.\n` +
+                    `Fix: adjust folder permissions or run your terminal as Administrator.\n` +
+                    `PowerShell example (may require Admin):\n` +
+                    `  icacls "${path.dirname(CONFIG_FILE)}" /grant "$env:USERNAME:(OI)(CI)F"`;
+            } else {
+                additionalInfo =
+                    `\nThe directory "${path.dirname(CONFIG_FILE)}" exists but you don't have write permissions.\n` +
+                    `Try running: chmod 755 "${path.dirname(CONFIG_FILE)}"`;
+            }
         } else if (errorCode === "ENOENT") {
             additionalInfo = `\nThe parent directory does not exist and could not be created.`;
         } else {
@@ -54,7 +62,9 @@ async function createDefaultConfig(): Promise<ConfigFile> {
                 `- Disk space issues\n` +
                 `- Filesystem restrictions\n` +
                 `\nYou can try creating the directory manually:\n` +
-                `  mkdir -p "${path.dirname(CONFIG_FILE)}"`;
+                (process.platform === "win32"
+                    ? `  mkdir "${path.dirname(CONFIG_FILE)}"`
+                    : `  mkdir -p "${path.dirname(CONFIG_FILE)}"`);
         }
 
         exitWithError(
@@ -80,7 +90,10 @@ export async function loadConfig(): Promise<ConfigFile> {
                 exitWithError(
                     `Your configuration file is corrupted.\n\n` +
                         `Fix: delete it to reset your configuration:\n` +
-                        `  rm -f ~/.enkryptify/config.json`,
+                        `  ${CONFIG_FILE}\n\n` +
+                        (process.platform === "win32"
+                            ? `Windows (PowerShell):\n  Remove-Item -Force "${CONFIG_FILE}"`
+                            : `macOS/Linux:\n  rm -f "${CONFIG_FILE}"`),
                 );
             }
 
@@ -120,7 +133,10 @@ export async function loadConfig(): Promise<ConfigFile> {
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
                 `Cannot read configuration file:\n"${CONFIG_FILE}"\n\n` +
-                    `Permission denied (EACCES). Check file permissions (chmod/chown).`,
+                    `Permission denied (EACCES).\n` +
+                    (process.platform === "win32"
+                        ? `Fix: adjust file permissions or run your terminal as Administrator.`
+                        : `Fix: check file permissions/ownership (chmod/chown).`),
             );
         }
 
@@ -140,7 +156,10 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError(
                 `Cannot write configuration file:\n"${CONFIG_FILE}"\n\n` +
-                    `Permission denied (EACCES). Check directory/file permissions (chmod/chown).`,
+                    `Permission denied (EACCES).\n` +
+                    (process.platform === "win32"
+                        ? `Fix: adjust folder permissions or run your terminal as Administrator.`
+                        : `Fix: check directory/file permissions (chmod/chown).`),
             );
         }
 

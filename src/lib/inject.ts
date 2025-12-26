@@ -32,6 +32,21 @@ const DANGEROUS_ENV_VARS = new Set([
     "SUDO_USER",
     "SUDO_UID",
     "SUDO_GID",
+    "COMSPEC",
+    "SYSTEMROOT",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "PROGRAMW6432",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "USERPROFILE",
+    "PSMODULEPATH",
 ]);
 
 function isDangerousEnvVar(name: string): boolean {
