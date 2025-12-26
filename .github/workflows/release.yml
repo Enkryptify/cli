@@ -27,9 +27,8 @@ jobs:
               run: |
                   set -euo pipefail
                   VERSION="${GITHUB_REF_NAME#v}"
+                  export VERSION
                   node -e 'const fs=require("fs"); const p=require("./package.json"); p.version=process.env.VERSION; fs.writeFileSync("./package.json", JSON.stringify(p,null,2)+"\n");'
-              env:
-                  VERSION: ${{ github.ref_name }}
 
             - name: Build Linux
               run: |
@@ -74,19 +73,16 @@ jobs:
               run: |
                   set -euo pipefail
                   VERSION="${GITHUB_REF_NAME#v}"
+                  export VERSION
                   node -e 'const fs=require("fs"); const p=require("./package.json"); p.version=process.env.VERSION; fs.writeFileSync("./package.json", JSON.stringify(p,null,2)+"\n");'
-              env:
-                  VERSION: ${{ github.ref_name }}
 
             - name: Build macOS
               run: |
                   set -euo pipefail
                   mkdir -p dist/bin dist/archives
 
-                  # Build x64 binary
                   bun build src/cli.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/ek
 
-                  # ✅ COPY COMPLETION FILES
                   cp src/complete/ek.bash dist/bin/
                   cp src/complete/ek.zsh  dist/bin/
 
@@ -97,7 +93,6 @@ jobs:
 
                   touch -t 202001010000 dist/bin/ek
 
-                  # Create arm64 tarball
                   COPYFILE_DISABLE=1 tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
             - uses: actions/upload-artifact@v4
@@ -120,8 +115,7 @@ jobs:
               shell: pwsh
               run: |
                   $version = $env:GITHUB_REF_NAME -replace '^v',''
-                  $env:VERSION = $version
-                  node -e "const fs=require('fs'); const p=require('./package.json'); p.version=process.env.VERSION; fs.writeFileSync('./package.json', JSON.stringify(p,null,2)+'`n');"
+                  node -e "const fs=require('fs'); const p=require('./package.json'); p.version='$version'; fs.writeFileSync('./package.json', JSON.stringify(p,null,2));"
 
             - name: Build Windows
               shell: pwsh
@@ -129,13 +123,10 @@ jobs:
                   New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
                   New-Item -ItemType Directory -Force dist\archives | Out-Null
 
-                  # Build CLI
                   bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
 
-                  # Copy PowerShell module INTO A FOLDER
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
-                  # Set fixed timestamps for deterministic zip (PowerShell)
                   $fixedDate = Get-Date "2020-01-01 00:00:00"
                   (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
