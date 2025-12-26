@@ -103,17 +103,23 @@ export class EnkryptifyProvider implements Provider {
             throw new Error("No workspaces found. Please create a workspace first before setting up.");
         }
 
-        const workspaceSlug = await selectName(
-            workspaces.map((ws) => `${ws.slug}`),
-            "Select workspace",
-        );
+        const workspaceMap = new Map<string, Workspace>();
+        const workspaceLabels = workspaces.map((ws) => {
+            const label = `${ws.name} (${ws.slug})`;
+            workspaceMap.set(label, ws);
+            return label;
+        });
 
-        if (!workspaceSlug) throw new Error("Failed to select workspace");
+        const selectedWorkspaceLabel = await selectName(workspaceLabels, "Select workspace");
 
-        const selectedWorkspace = workspaces.find((ws) => ws.slug === workspaceSlug);
+        if (!selectedWorkspaceLabel) throw new Error("Failed to select workspace");
+
+        const selectedWorkspace = workspaceMap.get(selectedWorkspaceLabel);
         if (!selectedWorkspace) {
             throw new Error("Failed to find selected workspace");
         }
+
+        const workspaceSlug = selectedWorkspace.slug;
 
         const projectsResponse = await this.fetchResource<ProjectTeam>(`/v1/workspace/${workspaceSlug}/project`);
 
@@ -130,17 +136,23 @@ export class EnkryptifyProvider implements Provider {
             );
         }
 
-        const projectSlug = await selectName(
-            allProjects.map((p) => p.slug),
-            "Select project",
-        );
+        const projectMap = new Map<string, Project>();
+        const projectLabels = allProjects.map((p) => {
+            const label = `${p.name} (${p.slug})`;
+            projectMap.set(label, p);
+            return label;
+        });
 
-        if (!projectSlug) throw new Error("Failed to select project");
+        const selectedProjectLabel = await selectName(projectLabels, "Select project");
 
-        const selectedProject = allProjects.find((p) => p.slug === projectSlug);
+        if (!selectedProjectLabel) throw new Error("Failed to select project");
+
+        const selectedProject = projectMap.get(selectedProjectLabel);
         if (!selectedProject) {
             throw new Error("Failed to find selected project");
         }
+
+        const projectSlug = selectedProject.slug;
 
         const environments = await this.fetchResource<Environment>(
             `/v1/workspace/${workspaceSlug}/project/${projectSlug}/environment`,

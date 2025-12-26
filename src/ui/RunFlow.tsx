@@ -1,3 +1,4 @@
+import ansiEscapes from "ansi-escapes";
 import { Box, Text, render } from "ink";
 import Spinner from "ink-spinner";
 
@@ -24,18 +25,22 @@ export async function RunFlow({ envName, run }: RunFlowProps): Promise<void> {
         stdout: process.stderr,
     });
 
-    const unmountSpinner = () => spinner.unmount();
+    let done = false;
+
+    const unmountSpinner = () => {
+        if (done) return;
+        done = true;
+
+        spinner.unmount();
+
+        process.stderr.write(ansiEscapes.eraseLines(1));
+    };
 
     try {
         await run(unmountSpinner);
-
-        const successMessage = envName
-            ? `Secrets injected successfully for environment "${envName}".\n`
-            : "Secrets injected successfully.\n";
-
-        process.stderr.write(successMessage);
+        unmountSpinner();
     } catch (error) {
-        spinner.unmount();
+        unmountSpinner();
         throw error;
     }
 }

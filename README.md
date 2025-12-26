@@ -79,20 +79,8 @@ src/
 │       └── httpClient.ts
 ├── lib/             # Shared utilities
 │   ├── config.ts    # All config management (auth + project)
-│   ├── inject.ts    # Secret injection
-│   ├── keyring.ts   # Secure keyring storage
-│   ├── error.ts     # Error handling
-│   ├── input.ts     # User input helpers
-│   └── terminal.ts  # Terminal utilities
+|
 └── ui/              # Ink UI components
-    ├── LoginFlow.tsx
-    ├── RunFlow.tsx
-    ├── EnkryptifyLogin.tsx
-    ├── AwsLogin.tsx
-    ├── SecretsTable.tsx
-    ├── SelectItem.tsx
-    ├── Confirm.tsx
-    └── SuccessMessage.tsx
 ```
 
 ---

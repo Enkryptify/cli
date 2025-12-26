@@ -27,6 +27,12 @@ export async function runCommand(
         options.unmountSpinner();
     }
 
+    // ✅ Print immediately after injection (before the user's command output starts)
+    const successMessage = options?.env
+        ? `Secrets injected successfully for environment "${options.env}".\n`
+        : "Secrets injected successfully.\n";
+    process.stderr.write(successMessage);
+
     if (cmd.length === 0) {
         throw new Error("Command is required. Please provide a command to run.");
     }
@@ -43,7 +49,7 @@ export async function runCommand(
         stdout: "inherit",
         stderr: "inherit",
     });
-    await proc.exited;
+
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
         throw new Error(`Command exited with code ${exitCode}`);
