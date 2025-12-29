@@ -216,7 +216,6 @@ export class AwsProvider implements Provider {
             await this.secretsClient.send(
                 new DeleteSecretCommand({
                     SecretId: fullName,
-                    ForceDeleteWithoutRecovery: true,
                 }),
             );
 

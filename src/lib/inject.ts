@@ -60,7 +60,7 @@ export function buildEnvWithSecrets(secrets: Secret[]): typeof process.env {
     const env = { ...process.env };
 
     for (const secret of secrets) {
-        if (!secret?.name) continue;
+        if (!secret?.name || secret.value == null) continue;
 
         if (isDangerousEnvVar(secret.name)) {
             console.warn(
@@ -75,6 +75,10 @@ export function buildEnvWithSecrets(secrets: Secret[]): typeof process.env {
             continue;
         }
 
+        if (typeof secret.value !== "string" || secret.value.includes("\0")) {
+            console.warn(`⚠️  Warning: Secret "${secret.name}" has an invalid value and will be skipped.`);
+            continue;
+        }
         env[secret.name] = secret.value;
     }
 

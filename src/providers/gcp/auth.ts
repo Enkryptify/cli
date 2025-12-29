@@ -54,7 +54,7 @@ export class GcpAuth implements AuthProvider {
                         return { accessToken: authData.accessToken };
                     }
                 } catch {
-                    throw new Error("could fetch auth the token.");
+                    throw new Error("Could not fetch the stored auth token. ");
                 }
             }
 

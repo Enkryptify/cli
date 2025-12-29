@@ -2,7 +2,7 @@ Register-ArgumentCompleter -CommandName ek -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
 
     try {
-        $args = $commandAst.CommandElements |
+        $cmdArgs = $commandAst.CommandElements |
             Select-Object -Skip 1 |
             ForEach-Object { $_.ToString() }
 
@@ -35,7 +35,7 @@ Register-ArgumentCompleter -CommandName ek -ScriptBlock {
             return
         }
 
-        $output = & $ekPath __complete $args 2>$null
+        $output = & $ekPath __complete $cmdArgs 2>$null
         
         if ($output) {
             $output | Where-Object { $_ -and $_.Trim() } | ForEach-Object {
