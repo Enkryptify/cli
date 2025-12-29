@@ -3,27 +3,276 @@ name: Release CLI
 on:
     push:
         tags:
-            - 'v*'
+            - "v*"
+
+concurrency:
+    group: release
+    cancel-in-progress: true
 
 jobs:
-    goreleaser:
+    build-linux:
         runs-on: ubuntu-latest
         steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
               with:
                   fetch-depth: 0
 
-            - name: Set up Go
-              uses: actions/setup-go@v4
+            - uses: oven-sh/setup-bun@v1
               with:
-                  go-version: '1.23'
+                  bun-version: "1.3.5"
 
-            - name: Run GoReleaser
-              uses: goreleaser/goreleaser-action@v5
+            - run: bun install
+
+            - name: Set package.json version from git tag
+              run: |
+                  set -euo pipefail
+                  VERSION="${GITHUB_REF_NAME#v}"
+                  export VERSION
+                  node -e 'const fs=require("fs"); const p=require("./package.json"); p.version=process.env.VERSION; fs.writeFileSync("./package.json", JSON.stringify(p,null,2)+"\n");'
+
+            - name: Build Linux
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist/bin dist/archives
+
+                  bun build src/cli.ts --compile --target=bun-linux-x64 --outfile=dist/bin/ek
+
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh  dist/bin/
+
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 \
+                    -czf dist/archives/enkryptify_Linux_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+                  bun build src/cli.ts --compile --target=bun-linux-arm64 --outfile=dist/bin/ek
+
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh  dist/bin/
+
+                  tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 \
+                    -czf dist/archives/enkryptify_Linux_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+            - uses: actions/upload-artifact@v4
               with:
-                  distribution: goreleaser
-                  version: latest
-                  args: release --clean
+                  name: linux
+                  path: dist/archives/*.tar.gz
+
+    build-macos:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: "1.3.5"
+
+            - run: bun install
+
+            - name: Set package.json version from git tag
+              run: |
+                  set -euo pipefail
+                  VERSION="${GITHUB_REF_NAME#v}"
+                  export VERSION
+                  node -e 'const fs=require("fs"); const p=require("./package.json"); p.version=process.env.VERSION; fs.writeFileSync("./package.json", JSON.stringify(p,null,2)+"\n");'
+
+            - name: Build macOS
+              run: |
+                  set -euo pipefail
+                  mkdir -p dist/bin dist/archives
+
+                  bun build src/cli.ts --compile --target=bun-darwin-x64 --outfile=dist/bin/ek
+
+                  cp src/complete/ek.bash dist/bin/
+                  cp src/complete/ek.zsh  dist/bin/
+
+                  touch -t 202001010000 dist/bin/ek dist/bin/ek.bash dist/bin/ek.zsh
+                  COPYFILE_DISABLE=1 tar -czf dist/archives/enkryptify_Darwin_x86_64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+                  bun build src/cli.ts --compile --target=bun-darwin-arm64 --outfile=dist/bin/ek
+
+                  touch -t 202001010000 dist/bin/ek dist/bin/ek.bash dist/bin/ek.zsh
+
+                  COPYFILE_DISABLE=1 tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: macos
+                  path: dist/archives/*.tar.gz
+
+    build-windows:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: "1.3.5"
+
+            - run: bun install
+
+            - name: Set package.json version from git tag
+              shell: pwsh
+              run: |
+                  $version = $env:GITHUB_REF_NAME -replace '^v',''
+                  node -e "const fs=require('fs'); const p=require('./package.json'); p.version='$version'; fs.writeFileSync('./package.json', JSON.stringify(p,null,2));"
+
+            - name: Build Windows
+              shell: pwsh
+              run: |
+                  New-Item -ItemType Directory -Force dist\bin\enkryptify-completion | Out-Null
+                  New-Item -ItemType Directory -Force dist\archives | Out-Null
+
+                  bun build src/cli.ts --compile --target=bun-windows-x64 --outfile=dist\bin\ek.exe
+
+                  Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
+
+                  $fixedDate = Get-Date "2020-01-01 00:00:00"
+                  (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
+                  (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
+
+                  Compress-Archive `
+                    -Path dist\bin\ek.exe, dist\bin\enkryptify-completion `
+                    -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
+                    -CompressionLevel Optimal
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: windows
+                  path: dist/archives/*.zip
+
+    publish:
+        needs: [build-linux, build-macos, build-windows]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ref: ${{ github.ref }}
+
+            - name: Get version from git tag
+              id: version
+              run: |
+                  TAG="${GITHUB_REF#refs/tags/}"
+                  VERSION="${TAG#v}"
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+            - uses: actions/download-artifact@v4
+              with:
+                  path: dist/archives
+                  merge-multiple: true
+
+            - name: Create combined checksums
+              run: |
+                  cd dist/archives
+                  rm -f checksums.txt
+                  sha256sum *.tar.gz *.zip 2>/dev/null | awk '{print $1 "  " $2}' > checksums.txt || \
+                  (shasum -a 256 *.tar.gz *.zip 2>/dev/null | awk '{print $1 "  " $2}' > checksums.txt)
+                  sort checksums.txt -o checksums.txt
+
+            - name: Publish GitHub release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.version.outputs.tag }}
+                  files: dist/archives/*
               env:
-                  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Update Homebrew tap
+              env:
+                  TAP_TOKEN: ${{ secrets.GH_TOKEN }}
+              run: |
+                  set -euo pipefail
+
+                  git clone https://x-access-token:${TAP_TOKEN}@github.com/Enkryptify/homebrew-enkryptify.git
+                  cd homebrew-enkryptify
+
+                  git config user.name  "Enkryptify Bot"
+                  git config user.email "bot@enkryptify.com"
+
+                  ARM_SHA=$(grep enkryptify_Darwin_arm64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
+                  X64_SHA=$(grep enkryptify_Darwin_x86_64.tar.gz ../dist/archives/checksums.txt | awk '{print $1}')
+                  VERSION="${{ steps.version.outputs.version }}"
+                  TAG="${{ steps.version.outputs.tag }}"
+
+                  cat > Formula/enkryptify.rb <<EOF
+                  class Enkryptify < Formula
+                    desc "Official Enkryptify CLI for injecting secrets into your codebase"
+                    homepage "https://enkryptify.com"
+                    version "${VERSION}"
+
+                    on_macos do
+                      if Hardware::CPU.arm?
+                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_arm64.tar.gz"
+                        sha256 "${ARM_SHA}"
+                      else
+                        url "https://github.com/Enkryptify/cli/releases/download/${TAG}/enkryptify_Darwin_x86_64.tar.gz"
+                        sha256 "${X64_SHA}"
+                      end
+                    end
+
+                    def install
+                      bin.install "ek"
+                      bash_completion.install "ek.bash" => "ek"
+                      zsh_completion.install "ek.zsh" => "_ek"
+                    end
+
+                    test do
+                      system "#{bin}/ek", "--version"
+                    end
+                  end
+                  EOF
+
+                  git add Formula/enkryptify.rb
+                  git commit -m "Update formula ${TAG}"
+                  git push
+
+            - name: Update Scoop bucket
+              env:
+                  SCOOP_TOKEN: ${{ secrets.GH_TOKEN }}
+              run: |
+                  set -euo pipefail
+
+                  git clone https://x-access-token:${SCOOP_TOKEN}@github.com/Enkryptify/scoop-enkryptify.git
+                  cd scoop-enkryptify
+
+                  git config user.name  "Enkryptify Bot"
+                  git config user.email "bot@enkryptify.com"
+
+                  VERSION="${{ steps.version.outputs.version }}"
+                  TAG="${{ steps.version.outputs.tag }}"
+
+                  ZIP="enkryptify_Windows_x86_64.zip"
+                  URL="https://github.com/Enkryptify/cli/releases/download/${TAG}/${ZIP}"
+
+                  SHA=$(grep "${ZIP}" ../dist/archives/checksums.txt | awk '{print $1}')
+
+                  cat > enkryptify.json <<EOF
+                  {
+                    "version": "${VERSION}",
+                    "architecture": {
+                      "64bit": {
+                        "url": "${URL}",
+                        "hash": "${SHA}"
+                      }
+                    },
+                    "bin": "ek.exe",
+                    "psmodule": {
+                      "name": "enkryptify-completion",
+                      "root": "enkryptify-completion"
+                    },
+                    "post_install": "Import-Module enkryptify-completion -ErrorAction SilentlyContinue",
+                    "homepage": "https://enkryptify.com",
+                    "description": "Official Enkryptify CLI for injecting secrets into your codebase",
+                    "license": "GPL-3.0-only"
+                  }
+                  EOF
+
+                  git add enkryptify.json
+                  git commit -m "Update enkryptify ${TAG}"
+                  git push
