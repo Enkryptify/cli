@@ -2,7 +2,6 @@
 set -euo pipefail
 
 REPO="Enkryptify/cli"
-BIN_NAME="ek"
 INSTALL_DIR="/usr/local/bin"
 
 # Check if bash is available (required for this script)

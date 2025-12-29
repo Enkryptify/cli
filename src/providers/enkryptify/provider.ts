@@ -259,7 +259,6 @@ export class EnkryptifyProvider implements Provider {
     async updateSecret(config: ProjectConfig, name: string, isPersonalFlag?: boolean): Promise<void> {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
-        // Fetch all secrets without environment filter to get full secret data
         const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`);
 
         if (response.data.length === 0) {
@@ -385,11 +384,11 @@ export class EnkryptifyProvider implements Provider {
         }
     }
 
-    checkProjectConfig(config: ProjectConfig) {
+    private checkProjectConfig(config: ProjectConfig) {
         const { workspace_slug, project_slug, environment_id } = config;
         if (!workspace_slug || !project_slug || !environment_id) {
             throw new Error(
-                "Invalid config: missing workspace_slug, project_slug, or environment_id pls run ek setup or ek configure first",
+                "Invalid config: missing workspace_slug, project_slug, or environment_id. Please run 'ek setup' or 'ek configure' first.",
             );
         }
         return { workspace_slug, project_slug, environment_id };

@@ -2,8 +2,6 @@
 
 Enkryptify CLI is a command-line tool that securely manages and injects secrets from various secret management providers (Enkryptify, AWS, etc.) directly into your commands and applications.
 
-**Key Features:**
-
 ## Quick Start
 
 ### 1. Login to Your Provider
@@ -73,7 +71,7 @@ src/
 │   ├── registry/    # Provider registry
 │   │   ├── ProviderRegistry.ts
 │   │   └── index.ts
-│   └── enkryptfiy/  # Enkryptify provider
+│   └── enkryptify/  # Enkryptify provider
 │       ├── provider.ts
 │       ├── auth.ts
 │       └── httpClient.ts
@@ -373,7 +371,7 @@ export const providerRegistry = new ProviderRegistry();
 **`providers/registry/index.ts` - Registration Point**
 
 ```typescript
-import { EnkryptifyProvider } from "@/providers/enkryptfiy/provider";
+import { EnkryptifyProvider } from "@/providers/enkryptify/provider";
 import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 
 // Register all providers here
@@ -577,10 +575,10 @@ Example: User runs `ek login --provider enkryptify`
    - Shows "Authenticating..." spinner
    - Calls provider.login(options)
 
-5. providers/enkryptfiy/provider.ts
+5. providers/enkryptify/provider.ts
    - Delegates to auth.login(options)
 
-6. providers/enkryptfiy/auth.ts
+6. providers/enkryptify/auth.ts
    - Runs OAuth PKCE flow
    - Opens browser
    - User authenticates
@@ -664,7 +662,7 @@ Before using the GCP provider:
 
 3. **Authenticate:**
 
-    gcloud auth application-default login 4.
+    gcloud auth application-default login
 
 4. **Verify Setup:**
    ek login --provider gcp

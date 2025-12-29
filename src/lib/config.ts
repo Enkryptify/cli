@@ -232,7 +232,7 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
     }
 
     throw new Error(
-        "No project configuration found. Please run 'ek configure or ek setup --provider ' to set up your project first.",
+        "No project configuration found. Please run 'ek configure or ek setup --provider <provider>' to set up your project first.",
     );
 }
 
