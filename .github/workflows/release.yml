@@ -13,13 +13,13 @@ jobs:
     build-linux:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
-            - uses: oven-sh/setup-bun@v1
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
-                  bun-version: "1.3.5"
+                  bun-version: "1.3.10"
 
             - run: bun install
 
@@ -59,13 +59,13 @@ jobs:
     build-macos:
         runs-on: macos-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
-            - uses: oven-sh/setup-bun@v1
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
-                  bun-version: "1.3.5"
+                  bun-version: "1.3.10"
 
             - run: bun install
 
@@ -103,13 +103,13 @@ jobs:
     build-windows:
         runs-on: windows-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
 
-            - uses: oven-sh/setup-bun@v1
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
-                  bun-version: "1.3.5"
+                  bun-version: "1.3.10"
 
-            - run: bun install
+            - run: bun install --frozen-lockfile --ignore-scripts
 
             - name: Set package.json version from git tag
               shell: pwsh
@@ -127,7 +127,7 @@ jobs:
 
                   Copy-Item src\complete\enkryptify-completion.psm1 dist\bin\enkryptify-completion\
 
-                  $fixedDate = Get-Date "2020-01-01 00:00:00"
+                  $fixedDate = Get-Date "2026-01-01 00:00:00"
                   (Get-Item dist\bin\ek.exe).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion).LastWriteTime = $fixedDate
                   (Get-Item dist\bin\enkryptify-completion\enkryptify-completion.psm1).LastWriteTime = $fixedDate
@@ -149,7 +149,7 @@ jobs:
             contents: write
 
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
                   ref: ${{ github.ref }}
@@ -162,7 +162,7 @@ jobs:
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
                   echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   path: dist/archives
                   merge-multiple: true
@@ -176,7 +176,7 @@ jobs:
                   sort checksums.txt -o checksums.txt
 
             - name: Publish GitHub release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b
               with:
                   tag_name: ${{ steps.version.outputs.tag }}
                   files: dist/archives/*
