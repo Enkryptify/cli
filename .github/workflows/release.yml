@@ -21,7 +21,7 @@ jobs:
               with:
                   bun-version: "1.3.10"
 
-            - run: bun install
+            - run: bun install --frozen-lockfile --ignore-scripts
 
             - name: Set package.json version from git tag
               run: |
@@ -67,7 +67,7 @@ jobs:
               with:
                   bun-version: "1.3.10"
 
-            - run: bun install
+            - run: bun install --frozen-lockfile --ignore-scripts
 
             - name: Set package.json version from git tag
               run: |
