@@ -20,6 +20,10 @@ type ConfigFile = {
     providers: {
         [providerName: string]: Record<string, string>;
     };
+    settings?: {
+        apiBaseUrl?: string;
+        [key: string]: string | undefined;
+    };
 };
 
 const CONFIG_FILE = path.join(os.homedir(), ".enkryptify", "config.json");
