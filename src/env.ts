@@ -1,9 +1,25 @@
 import { createEnv } from "@t3-oss/env-core";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { z } from "zod";
 import pkg from "../package.json" assert { type: "json" };
 
+function loadApiBaseUrlOverride(): string | undefined {
+    try {
+        const configPath = path.join(os.homedir(), ".enkryptify", "config.json");
+        const data = fs.readFileSync(configPath, "utf-8");
+        const config = JSON.parse(data) as { settings?: { apiBaseUrl?: string } };
+        return config.settings?.apiBaseUrl;
+    } catch {
+        return undefined;
+    }
+}
+
+const apiBaseUrlOverride = loadApiBaseUrlOverride();
+
 const defaults = {
-    API_BASE_URL: "https://api.enkryptify.com",
+    API_BASE_URL: apiBaseUrlOverride ?? "https://api.enkryptify.com",
     APP_BASE_URL: "https://app.enkryptify.com",
     GCP_RESOURCE_MANAGER_API: "https://cloudresourcemanager.googleapis.com/v1",
     GCP_AUTH_URL: "https://www.googleapis.com/auth/cloud-platform",
