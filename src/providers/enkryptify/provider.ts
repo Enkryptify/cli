@@ -212,9 +212,12 @@ export class EnkryptifyProvider implements Provider {
 
         const targetEnvironmentId = targetEnvironment.id;
 
-        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
-            params: { environment_id: targetEnvironmentId },
-        });
+        const response = await http.get<ApiSecret[]>(
+            `/v1/workspace/${workspace_slug}/project/${project_slug}/secret?resolve=true`,
+            {
+                params: { environment_id: targetEnvironmentId },
+            },
+        );
 
         const apiSecrets = response.data;
 
