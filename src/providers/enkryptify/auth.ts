@@ -280,7 +280,7 @@ export class EnkryptifyAuth implements AuthProvider {
     async getUserInfo(token: string): Promise<UserInfo | null> {
         const res = await http.get<UserInfo | string>("/v1/me", {
             headers: {
-                "X-API-Key": token,
+                "Authorization": `Bearer ${token}`,
             },
             validateStatus: () => true,
         });

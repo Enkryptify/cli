@@ -19,8 +19,8 @@ function loadApiBaseUrlOverride(): string | undefined {
 const apiBaseUrlOverride = loadApiBaseUrlOverride();
 
 const defaults = {
-    API_BASE_URL: apiBaseUrlOverride ?? "https://api.enkryptify.com",
-    APP_BASE_URL: "https://app.enkryptify.com",
+    API_BASE_URL: apiBaseUrlOverride ?? "http://localhost:8080",
+    APP_BASE_URL: "http://localhost:3000",
     GCP_RESOURCE_MANAGER_API: "https://cloudresourcemanager.googleapis.com/v1",
     GCP_AUTH_URL: "https://www.googleapis.com/auth/cloud-platform",
     GCP_AUTH_SCOPES: "https://www.googleapis.com/auth/cloud-platform",
