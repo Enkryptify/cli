@@ -47,7 +47,8 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
                     typeof token === "string" &&
                     requestConfig.headers &&
                     typeof requestConfig.headers === "object" &&
-                    !Array.isArray(requestConfig.headers)
+                    !Array.isArray(requestConfig.headers) &&
+                    !requestConfig.headers[config.authHeaderName]
                 ) {
                     const authValue = config.authHeaderPrefix ? `${config.authHeaderPrefix}${token}` : token;
                     requestConfig.headers[config.authHeaderName] = authValue;
