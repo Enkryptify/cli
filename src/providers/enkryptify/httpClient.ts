@@ -4,7 +4,8 @@ import { createAuthenticatedHttpClient } from "@/lib/sharedHttpClient";
 const http = createAuthenticatedHttpClient({
     baseURL: env.API_BASE_URL,
     keyringKey: "enkryptify",
-    authHeaderName: "X-API-Key",
+    authHeaderName: "Authorization",
+    authHeaderPrefix: "Bearer ",
 });
 
 http.interceptors.request.use((config) => {

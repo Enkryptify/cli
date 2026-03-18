@@ -75,7 +75,7 @@ export class GcpProvider implements Provider {
     }
 
     async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
-        const { projectId } = config;
+        const projectId = options?.project ?? config.projectId;
         if (!projectId) {
             throw new Error("Project id is not set. Configure the GCP project first.");
         }
