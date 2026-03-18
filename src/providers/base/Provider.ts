@@ -11,6 +11,7 @@ export type Secret = {
 
 export type runOptions = {
     env?: string;
+    project?: string;
     [key: string]: string | undefined;
 };
 

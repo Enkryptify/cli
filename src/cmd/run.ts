@@ -8,7 +8,7 @@ import type { Command } from "commander";
 export async function runCommand(
     projectconfig: ProjectConfig,
     cmd: string[],
-    options?: { env?: string; unmountSpinner?: () => void },
+    options?: { env?: string; project?: string; unmountSpinner?: () => void },
 ): Promise<void> {
     const provider = providerRegistry.get(projectconfig.provider);
     if (!provider) {
@@ -19,7 +19,7 @@ export async function runCommand(
         throw new Error(`Provider "${projectconfig.provider}" not found. Available providers: ${availableProviders}`);
     }
 
-    const secrets = await provider.run(projectconfig, { env: options?.env });
+    const secrets = await provider.run(projectconfig, { env: options?.env, project: options?.project });
     const env = buildEnvWithSecrets(secrets);
 
     // Unmount spinner right after secrets are fetched, before command runs
@@ -28,9 +28,16 @@ export async function runCommand(
     }
 
     // ✅ Print immediately after injection (before the user's command output starts)
-    const successMessage = options?.env
-        ? `Secrets injected successfully for environment "${options.env}".\n`
-        : "Secrets injected successfully.\n";
+    let successMessage = "Secrets injected successfully";
+    if (options?.project) {
+        successMessage += ` for project "${options.project}"`;
+    }
+    if (options?.env) {
+        successMessage += options?.project
+            ? ` environment "${options.env}"`
+            : ` for environment "${options.env}"`;
+    }
+    successMessage += ".\n";
     process.stderr.write(successMessage);
 
     if (cmd.length === 0) {
@@ -61,16 +68,22 @@ export function registerRunCommand(program: Command) {
         .command("run")
         .description("Run a command with secrets from the provider injected as environment variables.")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
+        .option("-p, --project <projectName>", "Project name to use (overrides default from config)")
         .argument(
             "<cmd...>",
             "Command and arguments to run (e.g. 'pnpm run dev' or use '--' to separate: 'ek run -- pnpm run dev')",
         )
-        .action(async (cmd: string[], opts: { env?: string }) => {
+        .action(async (cmd: string[], opts: { env?: string; project?: string }) => {
             try {
+                if (opts.project && !opts.env) {
+                    throw new Error("The --env option is required when using --project.");
+                }
+
                 const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
 
                 await RunFlow({
                     envName: opts.env,
+                    projectName: opts.project,
                     run: async (unmountSpinner) => {
                         await runCommand(projectConfig, cmd, {
                             ...opts,

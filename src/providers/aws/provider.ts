@@ -77,7 +77,7 @@ export class AwsProvider implements Provider {
         }
     }
     async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
-        const prefix = config.prefix ?? options?.env;
+        const prefix = options?.project ?? config.prefix ?? options?.env;
 
         if (!prefix) {
             throw new Error("AWS provider config is missing `prefix`");
