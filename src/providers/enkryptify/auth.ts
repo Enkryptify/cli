@@ -32,7 +32,7 @@ function base64Url(buf: Buffer) {
 export class EnkryptifyAuth implements AuthProvider {
     private readonly PROVIDER_NAME = "enkryptify";
     private readonly CLIENT_ID = "enkryptify-cli";
-    private readonly REDIRECT_URL = "https://app.enkryptify.com/callback";
+    private readonly REDIRECT_URL = "http://localhost:51823/callback";
     private readonly CALLBACK_PORT = 51823;
     private readonly DEFAULT_SCOPES = "openid profile email secrets:read secrets:write";
 
