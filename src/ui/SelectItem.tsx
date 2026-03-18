@@ -1,33 +1,30 @@
-import { Box, Text, render } from "ink";
-import SelectInput from "ink-select-input";
+import prompts from "prompts";
 
 export async function selectName(options: string[], title?: string): Promise<string> {
     if (!options.length) throw new Error("options array cannot be empty");
 
-    const items = options.map((name, index) => ({
-        label: name,
-        value: name,
-        key: `${name}-${index}`,
-    }));
+    const response = await prompts(
+        {
+            type: "select",
+            name: "value",
+            message: title || "Select an option",
+            choices: options.map((name) => ({
+                title: name,
+                value: name,
+            })),
+            initial: 0,
+        },
+        {
+            onCancel: () => {
+                process.exit(130);
+            },
+        },
+    );
 
-    return new Promise((resolve) => {
-        const app = render(
-            <Box flexDirection="column">
-                {title ? (
-                    <Box marginBottom={1}>
-                        <Text bold>{title}</Text>
-                    </Box>
-                ) : null}
+    const selectedValue: unknown = response.value;
+    if (typeof selectedValue !== "string" || selectedValue.length === 0) {
+        throw new Error("No option selected");
+    }
 
-                <SelectInput
-                    items={items}
-                    onSelect={(item) => {
-                        app.clear();
-                        app.unmount();
-                        resolve(item.value);
-                    }}
-                />
-            </Box>,
-        );
-    });
+    return selectedValue;
 }

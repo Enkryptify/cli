@@ -4,6 +4,7 @@ import Spinner from "ink-spinner";
 
 export interface RunFlowProps {
     envName?: string;
+    projectName?: string;
     run: (unmountSpinner: () => void) => Promise<void>;
 }
 
@@ -18,8 +19,15 @@ function SpinnerComponent({ message }: { message: string }) {
     );
 }
 
-export async function RunFlow({ envName, run }: RunFlowProps): Promise<void> {
-    const loadingMessage = envName ? `Injecting secrets for environment "${envName}"...` : "Injecting secrets...";
+export async function RunFlow({ envName, projectName, run }: RunFlowProps): Promise<void> {
+    let loadingMessage = "Injecting secrets";
+    if (projectName) {
+        loadingMessage += ` for project "${projectName}"`;
+    }
+    if (envName) {
+        loadingMessage += projectName ? ` environment "${envName}"` : ` for environment "${envName}"`;
+    }
+    loadingMessage += "...";
 
     const spinner = render(<SpinnerComponent message={loadingMessage} />, {
         stdout: process.stderr,

@@ -192,8 +192,10 @@ export class EnkryptifyProvider implements Provider {
     async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
+        const targetProjectSlug = options?.project ?? project_slug;
+
         const environments = await this.fetchResource<Environment>(
-            `/v1/workspace/${workspace_slug}/project/${project_slug}/environment`,
+            `/v1/workspace/${workspace_slug}/project/${targetProjectSlug}/environment`,
         );
         if (environments.length === 0) {
             throw new Error(
@@ -212,9 +214,12 @@ export class EnkryptifyProvider implements Provider {
 
         const targetEnvironmentId = targetEnvironment.id;
 
-        const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
-            params: { environment_id: targetEnvironmentId },
-        });
+        const response = await http.get<ApiSecret[]>(
+            `/v1/workspace/${workspace_slug}/project/${targetProjectSlug}/secret?resolve=true`,
+            {
+                params: { environment_id: targetEnvironmentId },
+            },
+        );
 
         const apiSecrets = response.data;
 

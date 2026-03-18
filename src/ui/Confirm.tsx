@@ -1,30 +1,19 @@
-import { Box, Text, render } from "ink";
-import SelectInput from "ink-select-input";
+import prompts from "prompts";
 
 export async function confirm(message: string): Promise<boolean> {
-    const items = [
-        { label: "Yes", value: true },
-        { label: "No", value: false },
-    ];
+    const response = await prompts(
+        {
+            type: "confirm",
+            name: "value",
+            message,
+            initial: true,
+        },
+        {
+            onCancel: () => {
+                process.exit(130);
+            },
+        },
+    );
 
-    return new Promise((resolve) => {
-        const app = render(
-            <Box flexDirection="column">
-                {message ? (
-                    <Box marginBottom={1}>
-                        <Text bold>{message}</Text>
-                    </Box>
-                ) : null}
-
-                <SelectInput
-                    items={items}
-                    onSelect={(item) => {
-                        app.clear();
-                        app.unmount();
-                        resolve(item.value);
-                    }}
-                />
-            </Box>,
-        );
-    });
+    return (response.value ?? false) === true;
 }
