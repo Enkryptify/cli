@@ -1,0 +1,159 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    lint:
+        name: Lint & Typecheck
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
+              with:
+                  bun-version: "1.3.10"
+
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+                  restore-keys: bun-${{ runner.os }}-
+
+            - run: bun install --frozen-lockfile
+
+            - name: ESLint
+              run: bun run lint
+
+            - name: Prettier
+              run: bun run format:check
+
+            - name: TypeScript type check
+              run: bun run typecheck
+
+    betterleaks:
+        name: Secret Scanning
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Install BetterLeaks
+              run: |
+                  set -euo pipefail
+                  BETTERLEAKS_VERSION=$(curl -s https://api.github.com/repos/betterleaks/betterleaks/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+                  curl -sSfL "https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS_VERSION}/betterleaks_${BETTERLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin betterleaks
+
+            - name: Scan for secrets
+              run: betterleaks git --source=. --report-format=sarif --report-path=betterleaks-results.sarif
+
+            - name: Upload SARIF results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: betterleaks-results
+                  path: betterleaks-results.sarif
+                  retention-days: 30
+
+    dependency-audit:
+        name: Dependency Audit
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
+              with:
+                  bun-version: "1.3.10"
+
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+                  restore-keys: bun-${{ runner.os }}-
+
+            - run: bun install --frozen-lockfile
+
+            - name: Audit dependencies
+              run: bunx audit-ci --moderate
+
+            - name: Generate SBOM
+              run: bunx @cyclonedx/cyclonedx-npm --output-file sbom.json
+
+            - name: Upload SBOM
+              uses: actions/upload-artifact@v4
+              with:
+                  name: sbom
+                  path: sbom.json
+                  retention-days: 90
+
+    build-verify:
+        name: Build (${{ matrix.label }})
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - label: linux-x64
+                      runner: blacksmith-2vcpu-ubuntu-2404
+                      target: bun-linux-x64
+                      can_verify: true
+                      binary: dist/ek
+                    - label: linux-arm64
+                      runner: blacksmith-2vcpu-ubuntu-2404-arm
+                      target: bun-linux-arm64
+                      can_verify: true
+                      binary: dist/ek
+                    - label: macos-arm64
+                      runner: blacksmith-2vcpu-ubuntu-2404-arm
+                      target: bun-darwin-arm64
+                      can_verify: false
+                      binary: dist/ek
+                    - label: macos-x64
+                      runner: blacksmith-2vcpu-ubuntu-2404
+                      target: bun-darwin-x64
+                      can_verify: false
+                      binary: dist/ek
+                    - label: windows-x64
+                      runner: blacksmith-2vcpu-windows-2025
+                      target: bun-windows-x64
+                      can_verify: true
+                      binary: dist/ek.exe
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
+              with:
+                  bun-version: "1.3.10"
+
+            - uses: actions/cache@v4
+              if: runner.os != 'Windows'
+              with:
+                  path: ~/.bun/install/cache
+                  key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+                  restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
+
+            - run: bun install --frozen-lockfile
+
+            - name: Compile binary
+              run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile=${{ matrix.binary }}
+
+            - name: Verify binary (Unix)
+              if: matrix.can_verify && runner.os != 'Windows'
+              run: |
+                  chmod +x ${{ matrix.binary }}
+                  ${{ matrix.binary }} -h
+
+            - name: Verify binary (Windows)
+              if: matrix.can_verify && runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  & ${{ matrix.binary }} -h
