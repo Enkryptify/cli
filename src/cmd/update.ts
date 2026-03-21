@@ -17,7 +17,7 @@ export function registerUpdateCommand(program: Command) {
     program
         .command("update")
         .description("Update a secret in the current environment")
-        .argument("<name>", "Secret name (key) to update. Example: ek update MySecret")
+        .argument("<name>", "Secret name (key) to update. Example: ek secret update MySecret")
         .option("--ispersonal", "Make the secret personal")
         .action(async (name: string, opts?: { ispersonal?: boolean }) => {
             try {
