@@ -11,7 +11,7 @@ export async function runCommand(
     cmd: string[],
     options?: { env?: string; project?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
 ): Promise<void> {
-    const { secrets, fromCache } = await fetchSecretsWithCache(
+    const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
         projectconfig,
         { env: options?.env, project: options?.project },
         { noCache: options?.noCache, offline: options?.offline },
@@ -24,8 +24,12 @@ export async function runCommand(
         options.unmountSpinner();
     }
 
-    if (fromCache) {
-        process.stderr.write("⚡ Using cached secrets. Use --no-cache to force a fresh fetch.\n");
+    if (fromCache && cacheReason === "fallback") {
+        process.stderr.write(
+            "⚠️  Could not reach the API. Using cached secrets as fallback. Use --skip-cache to disable.\n",
+        );
+    } else if (fromCache) {
+        process.stderr.write("⚡ Using cached secrets. Use --skip-cache to force a fresh fetch.\n");
     }
 
     let successMessage = "Secrets injected successfully";
@@ -69,14 +73,20 @@ export function registerRunCommand(program: Command) {
         .description("Run a command with secrets from Enkryptify injected as environment variables.")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
         .option("-p, --project <projectName>", "Project name to use (overrides default from config)")
+        .option("--skip-cache", "Skip cache and always fetch fresh secrets from the API")
+        .option("--offline", "Use cached secrets without contacting the API")
         .argument(
             "<cmd...>",
             "Command and arguments to run (e.g. 'pnpm run dev' or use '--' to separate: 'ek run -- pnpm run dev')",
         )
-        .action(async (cmd: string[], opts: { env?: string; project?: string }) => {
+        .action(async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
             try {
                 if (opts.project && !opts.env) {
                     throw new Error("The --env option is required when using --project.");
+                }
+
+                if (opts.skipCache && opts.offline) {
+                    throw new Error("--skip-cache and --offline cannot be used together.");
                 }
 
                 const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
@@ -86,7 +96,10 @@ export function registerRunCommand(program: Command) {
                     projectName: opts.project,
                     run: async (unmountSpinner) => {
                         await runCommand(projectConfig, cmd, {
-                            ...opts,
+                            env: opts.env,
+                            project: opts.project,
+                            noCache: opts.skipCache,
+                            offline: opts.offline,
                             unmountSpinner,
                         });
                     },

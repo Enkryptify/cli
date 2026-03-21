@@ -1,6 +1,7 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { logError } from "@/lib/error";
 import { type Secret, client } from "@/api/client";
+import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
 
@@ -26,11 +27,24 @@ function replaceVariables(content: string, secrets: Secret[]): string {
 export async function runFileCommand(
     projectConfig: ProjectConfig,
     filePath: string,
-    options?: { env?: string; unmountSpinner?: () => void },
+    options?: { env?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
 ): Promise<void> {
-    const secrets = await client.run(projectConfig, { env: options?.env });
+    const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
+        projectConfig,
+        { env: options?.env },
+        { noCache: options?.noCache, offline: options?.offline },
+        () => client.run(projectConfig, { env: options?.env }),
+    );
     if (options?.unmountSpinner) {
         options.unmountSpinner();
+    }
+
+    if (fromCache && cacheReason === "fallback") {
+        process.stderr.write(
+            "⚠️  Could not reach the API. Using cached secrets as fallback. Use --skip-cache to disable.\n",
+        );
+    } else if (fromCache) {
+        process.stderr.write("⚡ Using cached secrets. Use --skip-cache to force a fresh fetch.\n");
     }
 
     const successMessage = options?.env
@@ -55,8 +69,14 @@ export function registerRunFileCommand(program: Command) {
         .description("Process a file by replacing ${VARIABLE} placeholders with secrets from Enkryptify.")
         .requiredOption("-f, --file <path>", "Path to the file to process")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
-        .action(async (opts: { file: string; env?: string }) => {
+        .option("--skip-cache", "Skip cache and always fetch fresh secrets from the API")
+        .option("--offline", "Use cached secrets without contacting the API")
+        .action(async (opts: { file: string; env?: string; skipCache?: boolean; offline?: boolean }) => {
             try {
+                if (opts.skipCache && opts.offline) {
+                    throw new Error("--skip-cache and --offline cannot be used together.");
+                }
+
                 const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
 
                 await RunFlow({
@@ -64,6 +84,8 @@ export function registerRunFileCommand(program: Command) {
                     run: async (unmountSpinner) => {
                         await runFileCommand(projectConfig, opts.file, {
                             env: opts.env,
+                            noCache: opts.skipCache,
+                            offline: opts.offline,
                             unmountSpinner,
                         });
                     },
