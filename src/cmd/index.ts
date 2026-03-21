@@ -7,6 +7,7 @@ import { registerRunCommand } from "@/cmd/run";
 import { registerRunFileCommand } from "@/cmd/run-file";
 import { registerSdkCommand } from "@/cmd/sdk";
 import { registerUpdateCommand } from "@/cmd/update";
+import { registerUpgradeCommand } from "@/cmd/upgrade";
 import type { Command } from "commander";
 
 export function registerCommands(program: Command) {
@@ -19,4 +20,5 @@ export function registerCommands(program: Command) {
     registerCreateCommand(program);
     registerDeleteCommand(program);
     registerUpdateCommand(program);
+    registerUpgradeCommand(program);
 }

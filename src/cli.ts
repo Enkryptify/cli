@@ -2,6 +2,7 @@ import { registerCommands } from "@/cmd/index";
 import { env } from "@/env";
 import { logError } from "@/lib/error";
 import { setupTerminalCleanup } from "@/lib/terminal";
+import { checkForUpdate } from "@/lib/versionCheck";
 
 import { Command } from "commander";
 import { getCompletions } from "./complete/complete";
@@ -33,6 +34,11 @@ if (isCompletion) {
 }
 
 setupTerminalCleanup();
+
+const isUpgrade = process.argv[2] === "upgrade";
+if (!isCompletion && !isUpgrade) {
+    checkForUpdate().catch(() => {});
+}
 
 program.parseAsync(process.argv).catch((error) => {
     logError(error instanceof Error ? error.message : String(error));
