@@ -1,5 +1,4 @@
 import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
@@ -180,13 +179,6 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
 }
 
 async function updateProvider(providerName: string, settings: Record<string, string>): Promise<void> {
-    if (!providerRegistry.has(providerName)) {
-        const available = providerRegistry.list().map((p) => p.name);
-        const availableList = available.length > 0 ? available.join(", ") : "none";
-
-        exitWithError(`Provider "${providerName}" does not exist.\n` + `Available providers: ${availableList}`);
-    }
-
     const config = await loadConfig();
 
     config.providers[providerName] = {
@@ -236,7 +228,7 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
     }
 
     throw new Error(
-        "No project configuration found. Please run 'ek configure or ek setup --provider <provider>' to set up your project first.",
+        "No project configuration found. Please run 'ek configure' or 'ek setup' to set up your project first.",
     );
 }
 

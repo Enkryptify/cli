@@ -1,11 +1,19 @@
 import { env } from "@/env";
 import { config as configManager } from "@/lib/config";
 import { keyring } from "@/lib/keyring";
-import type { AuthProvider, Credentials, LoginOptions } from "@/providers/base/AuthProvider";
-import http from "@/providers/enkryptify/httpClient";
+import http from "@/api/httpClient";
 import { createHash, randomBytes } from "crypto";
 import open from "open";
 import { URL } from "url";
+
+export type Credentials = {
+    [key: string]: string;
+};
+
+export type LoginOptions = {
+    force?: boolean;
+    key?: string;
+};
 
 type UserInfo = {
     id: string;
@@ -29,8 +37,8 @@ function base64Url(buf: Buffer) {
     return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+/g, "");
 }
 
-export class EnkryptifyAuth implements AuthProvider {
-    private readonly PROVIDER_NAME = "enkryptify";
+export class Auth {
+    private readonly KEYRING_KEY = "enkryptify";
     private readonly CLIENT_ID = "enkryptify-cli";
     private readonly REDIRECT_URL = "http://localhost:51823/callback";
     private readonly CALLBACK_PORT = 51823;
@@ -49,16 +57,16 @@ export class EnkryptifyAuth implements AuthProvider {
 
         if (envToken) {
             if (options?.force) {
-                await keyring.delete(this.PROVIDER_NAME);
+                await keyring.delete(this.KEYRING_KEY);
             } else {
                 const isAuth = await this.getUserInfo(envToken).catch(() => false);
                 if (isAuth) {
                     console.log("Already authenticated. Use --force to re-authenticate.");
 
-                    await configManager.updateProvider(this.PROVIDER_NAME, {});
+                    await configManager.updateProvider(this.KEYRING_KEY, {});
                     return;
                 } else {
-                    await keyring.delete(this.PROVIDER_NAME);
+                    await keyring.delete(this.KEYRING_KEY);
                 }
             }
         }
@@ -217,7 +225,7 @@ export class EnkryptifyAuth implements AuthProvider {
           <head><title>Authentication Error</title></head>
           <body style="font-family: Inter, sans-serif; text-align: center; padding: 50px; background-color: #001B1F;">
             <h2 style="color: #E64545;">Authentication Error</h2>
-            <p style="color: #F7F7F7;">${this.escapeHtml(message)}</p>  
+            <p style="color: #F7F7F7;">${this.escapeHtml(message)}</p>
             <p style="color: #F7F7F7;">You can close this window and try again.</p>
           </body>
         </html>`,
@@ -266,7 +274,7 @@ export class EnkryptifyAuth implements AuthProvider {
 
     private async markAuthenticated(accessToken: string, user: UserInfo): Promise<void> {
         await keyring.set(
-            this.PROVIDER_NAME,
+            this.KEYRING_KEY,
             JSON.stringify({
                 accessToken,
                 userId: user.id,
@@ -274,7 +282,7 @@ export class EnkryptifyAuth implements AuthProvider {
             }),
         );
 
-        await configManager.updateProvider(this.PROVIDER_NAME, {});
+        await configManager.updateProvider(this.KEYRING_KEY, {});
     }
 
     async getUserInfo(token: string): Promise<UserInfo | null> {
@@ -298,20 +306,20 @@ export class EnkryptifyAuth implements AuthProvider {
     }
 
     async getCredentials(): Promise<Credentials> {
-        const authDataString = await keyring.get(this.PROVIDER_NAME);
+        const authDataString = await keyring.get(this.KEYRING_KEY);
         if (!authDataString) {
-            throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
+            throw new Error('Not authenticated. Please run "ek login" first.');
         }
 
         try {
             const authData = JSON.parse(authDataString) as StoredAuthData;
             if (!authData || !authData.accessToken) {
-                throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
+                throw new Error('Not authenticated. Please run "ek login" first.');
             }
             return { accessToken: authData.accessToken };
         } catch (error: unknown) {
             console.warn(error instanceof Error ? error.message : String(error));
-            throw new Error('Not authenticated. Please run "ek login enkryptify" first.');
+            throw new Error('Not authenticated. Please run "ek login" first.');
         }
     }
 }

@@ -1,23 +1,13 @@
 import { config } from "@/lib/config";
 import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { client } from "@/api/client";
 import { showSecretsTable } from "@/ui/SecretsTable";
 import { type Command } from "commander";
 
 export async function ListSecretsCommand(mode: "show" | "hide"): Promise<void> {
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        throw new Error(
-            `Provider "${projectConfig.provider}" not found. Available providers: ${providerRegistry
-                .list()
-                .map((p) => p.name)
-                .join(", ")}`,
-        );
-    }
-
-    const secrets = await provider.listSecrets(projectConfig, mode);
+    const secrets = await client.listSecrets(projectConfig, mode);
     showSecretsTable(secrets);
 }
 

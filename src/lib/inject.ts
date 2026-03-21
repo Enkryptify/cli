@@ -1,4 +1,4 @@
-import type { Secret } from "@/providers/base/Provider";
+import type { Secret } from "@/api/client";
 
 /**
  * Environment variables that should never be overridden by secrets

@@ -1,6 +1,6 @@
 import { config } from "@/lib/config";
 import { logError } from "@/lib/error";
-import http from "@/providers/enkryptify/httpClient";
+import http from "@/api/httpClient";
 import type { Command } from "commander";
 
 export function registerSdkCommand(program: Command): void {
