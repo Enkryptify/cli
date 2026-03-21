@@ -1,13 +1,25 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { getSecureInput, getTextInput } from "@/lib/input";
-import type { LoginOptions } from "@/providers/base/AuthProvider";
-import type { Provider, Secret, runOptions } from "@/providers/base/Provider";
-import { EnkryptifyAuth } from "@/providers/enkryptify/auth";
-import http from "@/providers/enkryptify/httpClient";
+import { Auth, type LoginOptions } from "@/api/auth";
+import http from "@/api/httpClient";
 import { confirm } from "@/ui/Confirm";
 import { selectName } from "@/ui/SelectItem";
 import { showMessage } from "@/ui/SuccessMessage";
 import { AxiosError } from "axios";
+
+export type Secret = {
+    id?: string;
+    name: string;
+    value: string;
+    isPersonal?: boolean;
+    environmentId?: string;
+};
+
+export type RunOptions = {
+    env?: string;
+    project?: string;
+    [key: string]: string | undefined;
+};
 
 type Workspace = {
     id: string;
@@ -44,12 +56,11 @@ type ApiSecret = {
     values: ApiSecretValue[];
 };
 
-export class EnkryptifyProvider implements Provider {
-    private auth: EnkryptifyAuth;
-    readonly name = "enkryptify";
+class EnkryptifyClient {
+    private auth: Auth;
 
     constructor() {
-        this.auth = new EnkryptifyAuth();
+        this.auth = new Auth();
     }
 
     async listSecrets(config: ProjectConfig, showValues?: string): Promise<Secret[]> {
@@ -94,8 +105,6 @@ export class EnkryptifyProvider implements Provider {
                 return setup;
             }
         }
-
-        const provider = this.name;
 
         const workspaces = await this.fetchResource<Workspace>("/v1/workspace");
 
@@ -176,7 +185,6 @@ export class EnkryptifyProvider implements Provider {
 
         const projectConfig: ProjectConfig = {
             path: options,
-            provider: provider,
             workspace_slug: workspaceSlug,
             project_slug: projectSlug,
             environment_id: environmentId,
@@ -189,7 +197,7 @@ export class EnkryptifyProvider implements Provider {
         return projectConfig;
     }
 
-    async run(config: ProjectConfig, options?: runOptions): Promise<Secret[]> {
+    async run(config: ProjectConfig, options?: RunOptions): Promise<Secret[]> {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
         const targetProjectSlug = options?.project ?? project_slug;
@@ -199,7 +207,7 @@ export class EnkryptifyProvider implements Provider {
         );
         if (environments.length === 0) {
             throw new Error(
-                `No environments found in project "${project_slug}". You can create an environment in the project settings`,
+                `No environments found in project "${targetProjectSlug}". You can create an environment in the project settings`,
             );
         }
 
@@ -399,3 +407,5 @@ export class EnkryptifyProvider implements Provider {
         return { workspace_slug, project_slug, environment_id };
     }
 }
+
+export const client = new EnkryptifyClient();

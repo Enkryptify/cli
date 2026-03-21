@@ -1,4 +1,4 @@
-import type { Secret } from "@/providers/base/Provider";
+import type { Secret } from "@/api/client";
 import { Box, Text, render, useStdout } from "ink";
 
 const MAX_ROWS_TO_DISPLAY = 100;

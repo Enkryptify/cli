@@ -1,6 +1,6 @@
 import { config } from "@/lib/config";
 import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function deleteSecretCommand(name: string): Promise<void> {
@@ -10,16 +10,7 @@ export async function deleteSecretCommand(name: string): Promise<void> {
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
-    }
-
-    await provider.deleteSecret(projectConfig, name);
+    await client.deleteSecret(projectConfig, name);
 }
 
 export function registerDeleteCommand(program: Command) {

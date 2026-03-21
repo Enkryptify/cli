@@ -1,7 +1,7 @@
 import { config } from "@/lib/config";
 import { logError } from "@/lib/error";
 import { getSecureInput } from "@/lib/input";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { client } from "@/api/client";
 import { showMessage } from "@/ui/SuccessMessage";
 import { type CreateSecretInput, createSecretSchema } from "@/validators/secret";
 import type { Command } from "commander";
@@ -23,16 +23,7 @@ export async function createSecretCommand(name: string, value: string): Promise<
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
-    }
-
-    await provider.createSecret(projectConfig, validName, validValue);
+    await client.createSecret(projectConfig, validName, validValue);
 
     showMessage(`Secret created successfully! Name: ${validName}`);
 }

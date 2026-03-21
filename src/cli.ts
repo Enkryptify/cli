@@ -2,7 +2,7 @@ import { registerCommands } from "@/cmd/index";
 import { env } from "@/env";
 import { logError } from "@/lib/error";
 import { setupTerminalCleanup } from "@/lib/terminal";
-import "@/providers/registry/index.js";
+
 import { Command } from "commander";
 import { getCompletions } from "./complete/complete";
 
