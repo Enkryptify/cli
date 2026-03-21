@@ -1,6 +1,7 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { logError } from "@/lib/error";
 import { buildEnvWithSecrets } from "@/lib/inject";
+import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { client } from "@/api/client";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
@@ -8,14 +9,23 @@ import type { Command } from "commander";
 export async function runCommand(
     projectconfig: ProjectConfig,
     cmd: string[],
-    options?: { env?: string; project?: string; unmountSpinner?: () => void },
+    options?: { env?: string; project?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
 ): Promise<void> {
-    const secrets = await client.run(projectconfig, { env: options?.env, project: options?.project });
+    const { secrets, fromCache } = await fetchSecretsWithCache(
+        projectconfig,
+        { env: options?.env, project: options?.project },
+        { noCache: options?.noCache, offline: options?.offline },
+        () => client.run(projectconfig, { env: options?.env, project: options?.project }),
+    );
     const env = buildEnvWithSecrets(secrets);
 
     // Unmount spinner right after secrets are fetched, before command runs
     if (options?.unmountSpinner) {
         options.unmountSpinner();
+    }
+
+    if (fromCache) {
+        process.stderr.write("⚡ Using cached secrets. Use --no-cache to force a fresh fetch.\n");
     }
 
     let successMessage = "Secrets injected successfully";
