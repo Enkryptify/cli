@@ -15,9 +15,12 @@ type CacheOptions = {
     offline?: boolean;
 };
 
+export type CacheReason = "ttl" | "offline" | "fallback";
+
 type CacheResult = {
     secrets: Secret[];
     fromCache: boolean;
+    cacheReason?: CacheReason;
 };
 
 function buildCacheKey(workspaceSlug: string, projectSlug: string, environmentKey: string): string {
@@ -63,12 +66,12 @@ export async function fetchSecretsWithCache(
     cacheOptions: CacheOptions,
     fetcher: () => Promise<Secret[]>,
 ): Promise<CacheResult> {
-    const workspaceSlug = config.workspace_slug;
-    const projectSlug = runOptions.project ?? config.project_slug;
-    const environmentKey = runOptions.env ?? config.environment_id;
+    const workspaceSlug = config.workspace_slug ?? "";
+    const projectSlug = runOptions.project ?? config.project_slug ?? "";
+    const environmentKey = runOptions.env ?? config.environment_id ?? "";
     const cacheKey = buildCacheKey(workspaceSlug, projectSlug, environmentKey);
 
-    // --no-cache: skip cache entirely, always fetch fresh
+    // --skip-cache: skip cache entirely, always fetch fresh
     if (cacheOptions.noCache) {
         const secrets = await fetcher();
         return { secrets, fromCache: false };
@@ -83,13 +86,13 @@ export async function fetchSecretsWithCache(
                     "Run 'ek run' at least once while online to populate the cache.",
             );
         }
-        return { secrets: cached.secrets, fromCache: true };
+        return { secrets: cached.secrets, fromCache: true, cacheReason: "offline" };
     }
 
     // Normal mode: check TTL, fetch if stale, fallback to cache on error
     const cached = await readCache(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-        return { secrets: cached.secrets, fromCache: true };
+        return { secrets: cached.secrets, fromCache: true, cacheReason: "ttl" };
     }
 
     try {
@@ -99,7 +102,7 @@ export async function fetchSecretsWithCache(
     } catch (error) {
         // API failed; fall back to any cached data regardless of age
         if (cached) {
-            return { secrets: cached.secrets, fromCache: true };
+            return { secrets: cached.secrets, fromCache: true, cacheReason: "fallback" };
         }
         // No cache available; re-throw
         throw error;
