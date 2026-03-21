@@ -16,9 +16,15 @@ export function registerCommands(program: Command) {
     registerRunCommand(program);
     registerRunFileCommand(program);
     registerSdkCommand(program);
-    registerListCommand(program);
-    registerCreateCommand(program);
-    registerDeleteCommand(program);
-    registerUpdateCommand(program);
+
+    const secretCommand = program
+        .command("secret")
+        .description("Manage secrets in the current environment");
+
+    registerListCommand(secretCommand);
+    registerCreateCommand(secretCommand);
+    registerDeleteCommand(secretCommand);
+    registerUpdateCommand(secretCommand);
+
     registerUpgradeCommand(program);
 }
