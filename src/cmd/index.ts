@@ -6,7 +6,6 @@ import { registerLoginCommand } from "@/cmd/login";
 import { registerRunCommand } from "@/cmd/run";
 import { registerRunFileCommand } from "@/cmd/run-file";
 import { registerSdkCommand } from "@/cmd/sdk";
-import { registerSetApiUrlCommand } from "@/cmd/setApiUrl";
 import { registerUpdateCommand } from "@/cmd/update";
 import type { Command } from "commander";
 
@@ -20,5 +19,4 @@ export function registerCommands(program: Command) {
     registerCreateCommand(program);
     registerDeleteCommand(program);
     registerUpdateCommand(program);
-    registerSetApiUrlCommand(program);
 }
