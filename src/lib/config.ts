@@ -5,16 +5,12 @@ import * as path from "path";
 
 export type ProjectConfig = {
     path: string;
-    provider: string;
     [key: string]: string;
 };
 
 type ConfigFile = {
     setups: {
-        [projectPath: string]: {
-            provider: string;
-            [key: string]: string;
-        };
+        [projectPath: string]: Record<string, string>;
     };
     providers: {
         [providerName: string]: Record<string, string>;
@@ -111,10 +107,7 @@ export async function loadConfig(): Promise<ConfigFile> {
                     if (!setup.path) continue;
                     const normalizedPath = path.resolve(setup.path);
                     const { path: _, ...setupData } = setup as ProjectConfig;
-                    setupsObj[normalizedPath] = {
-                        provider: setup.provider ?? "enkryptify",
-                        ...(setupData as Record<string, string>),
-                    };
+                    setupsObj[normalizedPath] = setupData as Record<string, string>;
                 }
 
                 config.setups = setupsObj;
@@ -178,20 +171,15 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
     }
 }
 
-async function updateProvider(providerName: string, settings: Record<string, string>): Promise<void> {
+async function markAuthenticated(): Promise<void> {
     const config = await loadConfig();
-
-    config.providers[providerName] = {
-        ...(config.providers[providerName] || {}),
-        ...settings,
-    };
-
+    config.providers["enkryptify"] = {};
     await saveConfig(config);
 }
 
-async function getProvider(providerName: string): Promise<Record<string, string> | null> {
+async function isAuthenticated(): Promise<boolean> {
     const config = await loadConfig();
-    return config.providers?.[providerName] || null;
+    return config.providers?.["enkryptify"] != null;
 }
 
 async function createConfigure(projectPath: string, projectConfig: ProjectConfig): Promise<void> {
@@ -233,8 +221,8 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
 }
 
 export const config = {
-    updateProvider,
-    getProvider,
+    markAuthenticated,
+    isAuthenticated,
     createConfigure,
     getConfigure,
     findProjectConfig,

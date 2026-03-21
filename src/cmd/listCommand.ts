@@ -4,7 +4,7 @@ import { client } from "@/api/client";
 import { showSecretsTable } from "@/ui/SecretsTable";
 import { type Command } from "commander";
 
-export async function ListSecretsCommand(mode: "show" | "hide"): Promise<void> {
+export async function listSecretsCommand(mode: "show" | "hide"): Promise<void> {
     const projectConfig = await config.findProjectConfig(process.cwd());
 
     const secrets = await client.listSecrets(projectConfig, mode);
@@ -20,7 +20,7 @@ export function registerListCommand(program: Command) {
             try {
                 const mode: "show" | "hide" = opts.show ? "show" : "hide";
 
-                await ListSecretsCommand(mode);
+                await listSecretsCommand(mode);
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 logError(errorMessage);

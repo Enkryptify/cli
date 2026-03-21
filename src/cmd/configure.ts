@@ -4,10 +4,10 @@ import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function configure(): Promise<void> {
-    const providerConfig = await config.getProvider("enkryptify");
-    if (!providerConfig) {
+    const authenticated = await config.isAuthenticated();
+    if (!authenticated) {
         throw new Error(
-            'Enkryptify is not configured. Please run "ek login" first.',
+            'Not authenticated. Please run "ek login" first.',
         );
     }
 

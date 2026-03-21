@@ -12,7 +12,6 @@ export type Credentials = {
 
 export type LoginOptions = {
     force?: boolean;
-    key?: string;
 };
 
 type UserInfo = {
@@ -63,7 +62,7 @@ export class Auth {
                 if (isAuth) {
                     console.log("Already authenticated. Use --force to re-authenticate.");
 
-                    await configManager.updateProvider(this.KEYRING_KEY, {});
+                    await configManager.markAuthenticated();
                     return;
                 } else {
                     await keyring.delete(this.KEYRING_KEY);
@@ -282,7 +281,7 @@ export class Auth {
             }),
         );
 
-        await configManager.updateProvider(this.KEYRING_KEY, {});
+        await configManager.markAuthenticated();
     }
 
     async getUserInfo(token: string): Promise<UserInfo | null> {

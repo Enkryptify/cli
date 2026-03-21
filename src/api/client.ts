@@ -185,7 +185,6 @@ class EnkryptifyClient {
 
         const projectConfig: ProjectConfig = {
             path: options,
-            provider: "enkryptify",
             workspace_slug: workspaceSlug,
             project_slug: projectSlug,
             environment_id: environmentId,
@@ -208,7 +207,7 @@ class EnkryptifyClient {
         );
         if (environments.length === 0) {
             throw new Error(
-                `No environments found in project "${project_slug}". You can create an environment in the project settings`,
+                `No environments found in project "${targetProjectSlug}". You can create an environment in the project settings`,
             );
         }
 

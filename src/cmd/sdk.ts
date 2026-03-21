@@ -24,7 +24,7 @@ export function registerSdkCommand(program: Command): void {
                 // getConfigure returns null if not found, doesn't throw
             }
 
-            if (!setup || setup.provider !== "enkryptify") {
+            if (!setup) {
                 logError("No Enkryptify project configured in this directory. Run `ek configure` first.");
                 process.exit(1);
             }
