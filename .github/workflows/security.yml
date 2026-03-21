@@ -1,0 +1,84 @@
+name: Security Scan
+
+on:
+    schedule:
+        - cron: "0 8 * * 1" # Every Monday at 08:00 UTC
+    workflow_dispatch:
+
+jobs:
+    dependency-audit:
+        name: Dependency Audit
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
+              with:
+                  bun-version: "1.3.10"
+
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+                  restore-keys: bun-${{ runner.os }}-
+
+            - run: bun install --frozen-lockfile
+
+            - name: Audit dependencies
+              run: bunx audit-ci --moderate
+
+            - name: Generate SBOM
+              run: bunx @cyclonedx/cyclonedx-npm --output-file sbom.json
+
+            - name: Upload SBOM
+              uses: actions/upload-artifact@v4
+              with:
+                  name: sbom-weekly
+                  path: sbom.json
+                  retention-days: 90
+
+    betterleaks-full:
+        name: Full Secret Scan
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Install BetterLeaks
+              run: |
+                  set -euo pipefail
+                  BETTERLEAKS_VERSION=$(curl -s https://api.github.com/repos/betterleaks/betterleaks/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+                  curl -sSfL "https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS_VERSION}/betterleaks_${BETTERLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin betterleaks
+
+            - name: Full history scan
+              run: betterleaks git --source=. --report-format=sarif --report-path=betterleaks-results.sarif
+
+            - name: Upload SARIF results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: betterleaks-full-results
+                  path: betterleaks-results.sarif
+                  retention-days: 90
+
+    license-check:
+        name: License Compliance
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
+              with:
+                  bun-version: "1.3.10"
+
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.bun/install/cache
+                  key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+                  restore-keys: bun-${{ runner.os }}-
+
+            - run: bun install --frozen-lockfile
+
+            - name: Check licenses
+              run: bunx license-checker --production --failOn "AGPL-3.0-only;AGPL-3.0-or-later;SSPL-1.0"
