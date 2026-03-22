@@ -22,7 +22,7 @@ type ConfigFile = {
     };
 };
 
-const CONFIG_FILE = path.join(os.homedir(), ".enkryptify", "config.json");
+const CONFIG_FILE = process.env.ENKRYPTIFY_CONFIG_PATH ?? path.join(os.homedir(), ".enkryptify", "config.json");
 
 function exitWithError(message: string, options?: { why?: string; fix?: string; docs?: string }): never {
     logger.error(message, options);
