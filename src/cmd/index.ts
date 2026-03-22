@@ -17,9 +17,7 @@ export function registerCommands(program: Command) {
     registerRunFileCommand(program);
     registerSdkCommand(program);
 
-    const secretCommand = program
-        .command("secret")
-        .description("Manage secrets in the current environment");
+    const secretCommand = program.command("secret").description("Manage secrets in the current environment");
 
     registerListCommand(secretCommand);
     registerCreateCommand(secretCommand);

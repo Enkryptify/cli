@@ -97,7 +97,7 @@ export const CLI_ERRORS = {
         fix: (): string =>
             process.platform === "win32"
                 ? "Adjust folder permissions or run your terminal as Administrator."
-                : 'Check file permissions: chmod 755 ~/.enkryptify',
+                : "Check file permissions: chmod 755 ~/.enkryptify",
     },
     CONFIG_READ_ONLY_FS: {
         message: "Cannot save the configuration file.",
@@ -158,7 +158,7 @@ export const CLI_ERRORS = {
     // Commands
     COMMAND_MISSING: {
         message: "No command provided.",
-        fix: 'Usage: ek run -- <your-command>. Example: ek run -- npm start',
+        fix: "Usage: ek run -- <your-command>. Example: ek run -- npm start",
     },
     COMMAND_CONFLICTING_FLAGS: {
         message: "Conflicting options: --skip-cache and --offline cannot be used together.",

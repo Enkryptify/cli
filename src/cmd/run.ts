@@ -38,9 +38,7 @@ export async function runCommand(
         successMessage += ` for project "${options.project}"`;
     }
     if (options?.env) {
-        successMessage += options?.project
-            ? ` environment "${options.env}"`
-            : ` for environment "${options.env}"`;
+        successMessage += options?.project ? ` environment "${options.env}"` : ` for environment "${options.env}"`;
     }
     successMessage += ".";
     logger.stderr.success(successMessage);
@@ -83,38 +81,40 @@ export function registerRunCommand(program: Command) {
             "<cmd...>",
             "Command and arguments to run (e.g. 'pnpm run dev' or use '--' to separate: 'ek run -- pnpm run dev')",
         )
-        .action(async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
-            try {
-                if (opts.project && !opts.env) {
-                    throw CLIError.from("ENV_REQUIRED_WITH_PROJECT");
-                }
+        .action(
+            async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
+                try {
+                    if (opts.project && !opts.env) {
+                        throw CLIError.from("ENV_REQUIRED_WITH_PROJECT");
+                    }
 
-                if (opts.skipCache && opts.offline) {
-                    throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
-                }
+                    if (opts.skipCache && opts.offline) {
+                        throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
+                    }
 
-                const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
+                    const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
 
-                await RunFlow({
-                    envName: opts.env,
-                    projectName: opts.project,
-                    run: async (unmountSpinner) => {
-                        await runCommand(projectConfig, cmd, {
-                            env: opts.env,
-                            project: opts.project,
-                            noCache: opts.skipCache,
-                            offline: opts.offline,
-                            unmountSpinner,
-                        });
-                    },
-                });
-            } catch (error) {
-                if (error instanceof CLIError) {
-                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
-                } else {
-                    logger.error(error instanceof Error ? error.message : String(error));
+                    await RunFlow({
+                        envName: opts.env,
+                        projectName: opts.project,
+                        run: async (unmountSpinner) => {
+                            await runCommand(projectConfig, cmd, {
+                                env: opts.env,
+                                project: opts.project,
+                                noCache: opts.skipCache,
+                                offline: opts.offline,
+                                unmountSpinner,
+                            });
+                        },
+                    });
+                } catch (error) {
+                    if (error instanceof CLIError) {
+                        logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                    } else {
+                        logger.error(error instanceof Error ? error.message : String(error));
+                    }
+                    process.exit(1);
                 }
-                process.exit(1);
-            }
-        });
+            },
+        );
 }

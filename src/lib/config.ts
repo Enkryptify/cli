@@ -52,14 +52,16 @@ async function createDefaultConfig(): Promise<ConfigFile> {
             }
         } else if (errorCode === "ENOENT") {
             why = "The parent directory does not exist and could not be created.";
-            fix = process.platform === "win32"
-                ? `Create the directory manually: mkdir "${path.dirname(CONFIG_FILE)}"`
-                : `Create the directory manually: mkdir -p "${path.dirname(CONFIG_FILE)}"`;
+            fix =
+                process.platform === "win32"
+                    ? `Create the directory manually: mkdir "${path.dirname(CONFIG_FILE)}"`
+                    : `Create the directory manually: mkdir -p "${path.dirname(CONFIG_FILE)}"`;
         } else {
             why = errorMessage;
-            fix = process.platform === "win32"
-                ? `Try creating the directory manually: mkdir "${path.dirname(CONFIG_FILE)}"`
-                : `Try creating the directory manually: mkdir -p "${path.dirname(CONFIG_FILE)}"`;
+            fix =
+                process.platform === "win32"
+                    ? `Try creating the directory manually: mkdir "${path.dirname(CONFIG_FILE)}"`
+                    : `Try creating the directory manually: mkdir -p "${path.dirname(CONFIG_FILE)}"`;
         }
 
         exitWithError("Could not create the configuration file.", { why, fix });
@@ -123,9 +125,10 @@ export async function loadConfig(): Promise<ConfigFile> {
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError("Cannot read the configuration file.", {
                 why: "Permission denied.",
-                fix: process.platform === "win32"
-                    ? "Adjust file permissions or run your terminal as Administrator."
-                    : "Check file permissions/ownership: chmod 644 ~/.enkryptify/config.json",
+                fix:
+                    process.platform === "win32"
+                        ? "Adjust file permissions or run your terminal as Administrator."
+                        : "Check file permissions/ownership: chmod 644 ~/.enkryptify/config.json",
             });
         }
 
@@ -148,9 +151,10 @@ export async function saveConfig(config: ConfigFile): Promise<void> {
         if (err instanceof Error && "code" in err && err.code === "EACCES") {
             exitWithError("Cannot save the configuration file.", {
                 why: "Permission denied.",
-                fix: process.platform === "win32"
-                    ? "Adjust folder permissions or run your terminal as Administrator."
-                    : "Check directory/file permissions: chmod 755 ~/.enkryptify",
+                fix:
+                    process.platform === "win32"
+                        ? "Adjust folder permissions or run your terminal as Administrator."
+                        : "Check directory/file permissions: chmod 755 ~/.enkryptify",
             });
         }
 
