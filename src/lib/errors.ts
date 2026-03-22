@@ -29,13 +29,13 @@ export const CLI_ERRORS = {
         message: "Not authenticated.",
         why: "No valid credentials were found.",
         fix: 'Run "ek login" to authenticate.',
-        docs: "/cli/auth",
+        docs: "/cli/troubleshooting#authentication",
     },
     AUTH_TOKEN_EXPIRED: {
         message: "Authentication failed.",
         why: "Your session has expired or your credentials are invalid.",
         fix: 'Run "ek login" to re-authenticate.',
-        docs: "/cli/auth",
+        docs: "/cli/troubleshooting#authentication",
     },
     AUTH_TIMEOUT: {
         message: "Authentication timed out.",
@@ -48,7 +48,7 @@ export const CLI_ERRORS = {
         fix: 'Run "ek login" to try again.',
     },
     AUTH_MISSING_CODE: {
-        message: "Authentication failed — no authorization was received.",
+        message: "Authentication failed. No authorization was received.",
         why: "The browser did not return a valid authorization code. You may have denied access or the flow was interrupted.",
         fix: 'Run "ek login" to try again.',
     },
@@ -59,7 +59,7 @@ export const CLI_ERRORS = {
     },
     AUTH_MISSING_TOKEN: {
         message: "Could not complete the login.",
-        why: "The server response was incomplete — no access token was provided.",
+        why: "The server response was incomplete. No access token was provided.",
         fix: 'Run "ek login" to try again.',
     },
     AUTH_USER_INFO_FAILED: {
@@ -78,13 +78,13 @@ export const CLI_ERRORS = {
         message: "No project configured for this directory.",
         why: "No Enkryptify configuration was found in this directory or any parent directory.",
         fix: 'Run "ek configure" to set up your project.',
-        docs: "/cli/configure",
+        docs: "/cli/troubleshooting#configuration",
     },
     CONFIG_CORRUPTED: {
         message: "Configuration file is corrupted.",
         why: "The file contains invalid data.",
         fix: "Delete the file to reset: ~/.enkryptify/config.json",
-        docs: "/cli/configure",
+        docs: "/cli/troubleshooting#configuration",
     },
     CONFIG_INVALID_JSON: {
         message: "Configuration file contains invalid JSON.",
@@ -106,9 +106,9 @@ export const CLI_ERRORS = {
     },
     CONFIG_INCOMPLETE: {
         message: "Your project configuration is incomplete.",
-        why: "The configuration file is missing required fields (workspace, project, or environment).",
+        why: "The configuration file is missing required fields (workspace, project or environment).",
         fix: 'Run "ek configure" to set up your project.',
-        docs: "/cli/configure",
+        docs: "/cli/troubleshooting#configuration",
     },
 
     // API / HTTP
@@ -116,7 +116,7 @@ export const CLI_ERRORS = {
         message: "Authentication failed.",
         why: "Your session has expired or your credentials are invalid.",
         fix: 'Run "ek login" to re-authenticate.',
-        docs: "/cli/auth",
+        docs: "/cli/troubleshooting#authentication",
     },
     API_FORBIDDEN: {
         message: "Access denied.",
@@ -125,7 +125,7 @@ export const CLI_ERRORS = {
     },
     API_NOT_FOUND: {
         message: "The requested resource was not found.",
-        why: "The workspace, project, environment, or secret you're trying to access doesn't exist.",
+        why: "The workspace, project, environment or secret you're trying to access doesn't exist.",
         fix: 'Run "ek configure" to update your project settings.',
     },
     API_SERVER_ERROR: {
@@ -135,16 +135,16 @@ export const CLI_ERRORS = {
     },
     API_NETWORK_ERROR: {
         message: "Could not connect to the Enkryptify API.",
-        why: "The API server is unreachable. This could be a network issue, firewall, or the server may be down.",
-        fix: 'Check your internet connection and try again. Use "ek run --offline" to use cached secrets.',
-        docs: "/cli/troubleshooting",
+        why: "The API server is unreachable. This could be a network issue, a firewall or the server may be down.",
+        fix: "Check your internet connection and try again.",
+        docs: "/cli/troubleshooting#network",
     },
 
     // Validation
     VALIDATION_SECRET_NAME: {
         message: "Invalid secret name.",
-        why: "Secret names can only contain letters (A-Z, a-z), numbers (0-9), underscores (_), and hyphens (-).",
-        docs: "/cli/secrets",
+        why: "Secret names can only contain letters (A-Z, a-z), numbers (0-9), underscores (_) and hyphens (-).",
+        docs: "/cli/troubleshooting#secrets",
     },
     VALIDATION_SECRET_VALUE_EMPTY: {
         message: "Secret value cannot be empty.",
@@ -176,19 +176,19 @@ export const CLI_ERRORS = {
         message: "No workspaces found.",
         why: "Your account doesn't have any workspaces yet.",
         fix: "Create a workspace in the Enkryptify dashboard first.",
-        docs: "/getting-started",
+        docs: "/getting-started/quickstart",
     },
     NO_PROJECTS: {
         message: "No projects found.",
         why: "This workspace doesn't have any projects yet.",
         fix: "Create a project in the Enkryptify dashboard.",
-        docs: "/getting-started",
+        docs: "/getting-started/quickstart",
     },
     NO_ENVIRONMENTS: {
         message: "No environments found.",
         why: "This project doesn't have any environments set up yet.",
         fix: "Create an environment in the project settings on the Enkryptify dashboard.",
-        docs: "/getting-started",
+        docs: "/getting-started/quickstart",
     },
     NO_SECRETS: {
         message: "No secrets found.",
@@ -204,7 +204,7 @@ export const CLI_ERRORS = {
     SDK_NOT_CONFIGURED: {
         message: "No project configured in this directory.",
         fix: 'Run "ek configure" to set up your project first.',
-        docs: "/cli/configure",
+        docs: "/cli/troubleshooting#configuration",
     },
 
     // Cache
@@ -216,13 +216,13 @@ export const CLI_ERRORS = {
 
     // Upgrade
     UPGRADE_PERMISSION_DENIED: {
-        message: "Upgrade failed — permission denied.",
+        message: "Upgrade failed due to insufficient permissions.",
         why: "The CLI binary could not be overwritten due to file permissions.",
         fix: "Run with elevated permissions: sudo ek upgrade",
     },
     UPGRADE_CORRUPTED: {
-        message: "Upgrade failed — the download appears to be corrupted.",
-        fix: "Try again, or download manually from https://github.com/Enkryptify/cli/releases",
+        message: "Upgrade failed. The download appears to be corrupted.",
+        fix: "Try again or download manually from https://github.com/Enkryptify/cli/releases",
     },
     UPGRADE_CHECK_FAILED: {
         message: "Could not check for updates.",

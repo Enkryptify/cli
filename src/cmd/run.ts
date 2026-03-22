@@ -27,7 +27,7 @@ export async function runCommand(
 
     if (fromCache && cacheReason === "fallback") {
         logger.stderr.warn(
-            "Could not reach the Enkryptify API — using cached secrets as a fallback. Use --skip-cache to disable.",
+            "Could not reach the Enkryptify API. Using cached secrets as a fallback. Use --skip-cache to disable.",
         );
     } else if (fromCache) {
         logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");

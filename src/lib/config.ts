@@ -83,7 +83,7 @@ export async function loadConfig(): Promise<ConfigFile> {
                 exitWithError("Configuration file is corrupted.", {
                     why: "The file contains invalid data.",
                     fix: `Delete the file to reset:\n  ${process.platform === "win32" ? `Remove-Item -Force "${CONFIG_FILE}"` : `rm -f "${CONFIG_FILE}"`}`,
-                    docs: "/cli/configure",
+                    docs: "/cli/troubleshooting#configuration",
                 });
             }
 
@@ -217,7 +217,7 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
         "No project configured for this directory.",
         "No Enkryptify configuration was found in this directory or any parent directory.",
         'Run "ek configure" to set up your project.',
-        "/cli/configure",
+        "/cli/troubleshooting#configuration",
     );
 }
 

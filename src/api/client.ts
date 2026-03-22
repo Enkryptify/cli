@@ -114,7 +114,7 @@ class EnkryptifyClient {
                 "No workspaces found.",
                 "Your account doesn't have any workspaces yet.",
                 "Create a workspace in the Enkryptify dashboard first.",
-                "/getting-started",
+                "/getting-started/quickstart",
             );
         }
 
@@ -160,7 +160,7 @@ class EnkryptifyClient {
                 `No projects found in workspace "${selectedWorkspace.name}".`,
                 "This workspace doesn't have any projects yet.",
                 "Create a project in the Enkryptify dashboard.",
-                "/getting-started",
+                "/getting-started/quickstart",
             );
         }
 
@@ -201,7 +201,7 @@ class EnkryptifyClient {
                 `No environments found in project "${selectedProject.name}".`,
                 "This project doesn't have any environments set up yet.",
                 "Create an environment in the project settings on the Enkryptify dashboard.",
-                "/getting-started",
+                "/getting-started/quickstart",
             );
         }
 
@@ -254,7 +254,7 @@ class EnkryptifyClient {
                 `No environments found in project "${targetProjectSlug}".`,
                 "This project doesn't have any environments set up yet.",
                 "Create an environment in the project settings on the Enkryptify dashboard.",
-                "/getting-started",
+                "/getting-started/quickstart",
             );
         }
 
@@ -362,7 +362,7 @@ class EnkryptifyClient {
         if (!namePattern.test(newName)) {
             throw new CLIError(
                 `Invalid secret name "${newName}".`,
-                "Secret names can only contain letters (A-Z, a-z), numbers (0-9), underscores (_), and hyphens (-).",
+                "Secret names can only contain letters (A-Z, a-z), numbers (0-9), underscores (_) and hyphens (-).",
             );
         }
 
@@ -370,7 +370,7 @@ class EnkryptifyClient {
             throw new CLIError(
                 `A secret named "${newName}" already exists.`,
                 undefined,
-                `Use "ek update ${newName}" to modify it, or choose a different name.`,
+                `Use "ek update ${newName}" to modify it or choose a different name.`,
             );
         }
 
@@ -492,9 +492,9 @@ class EnkryptifyClient {
         if (!workspace_slug || !project_slug || !environment_id) {
             throw new CLIError(
                 "Your project configuration is incomplete.",
-                "The configuration file is missing required fields (workspace, project, or environment).",
+                "The configuration file is missing required fields (workspace, project or environment).",
                 'Run "ek configure" to set up your project.',
-                "/cli/configure",
+                "/cli/troubleshooting#configuration",
             );
         }
         return { workspace_slug, project_slug, environment_id };

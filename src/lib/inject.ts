@@ -65,18 +65,18 @@ export function buildEnvWithSecrets(secrets: Secret[]): typeof process.env {
 
         if (isDangerousEnvVar(secret.name)) {
             logger.warn(
-                `Secret "${secret.name}" was skipped — it conflicts with a protected environment variable (${secret.name.toUpperCase()}).`,
+                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${secret.name.toUpperCase()}).`,
             );
             continue;
         }
 
         if (secret.name.includes("\0")) {
-            logger.warn(`Secret "${secret.name}" was skipped — the name contains invalid characters.`);
+            logger.warn(`Secret "${secret.name}" was skipped. The name contains invalid characters.`);
             continue;
         }
 
         if (typeof secret.value !== "string" || secret.value.includes("\0")) {
-            logger.warn(`Secret "${secret.name}" was skipped — the value is invalid.`);
+            logger.warn(`Secret "${secret.name}" was skipped. The value is invalid.`);
             continue;
         }
         env[secret.name] = secret.value;

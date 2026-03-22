@@ -30,7 +30,7 @@ export function registerSdkCommand(program: Command): void {
             if (!setup) {
                 logger.error("No project configured in this directory.", {
                     fix: 'Run "ek configure" to set up your project first.',
-                    docs: "/cli/configure",
+                    docs: "/cli/troubleshooting#configuration",
                 });
                 process.exit(1);
             }

@@ -27,7 +27,7 @@ const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
         message: "Authentication failed.",
         why: "Your session has expired or your credentials are invalid.",
         fix: 'Run "ek login" to re-authenticate.',
-        docs: "/cli/auth",
+        docs: "/cli/troubleshooting#authentication",
     },
     403: {
         message: "Access denied.",
@@ -36,7 +36,7 @@ const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
     },
     404: {
         message: "The requested resource was not found.",
-        why: "The workspace, project, environment, or secret you're trying to access doesn't exist.",
+        why: "The workspace, project, environment or secret you're trying to access doesn't exist.",
         fix: 'Run "ek configure" to update your project settings.',
     },
     500: {
@@ -103,9 +103,9 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
                 return Promise.reject(
                     new CLIError(
                         "Could not connect to the Enkryptify API.",
-                        "The API server is unreachable. This could be a network issue, firewall, or the server may be down.",
-                        'Check your internet connection and try again. Use "ek run --offline" to use cached secrets.',
-                        "/cli/troubleshooting",
+                        "The API server is unreachable. This could be a network issue, a firewall or the server may be down.",
+                        "Check your internet connection and try again.",
+                        "/cli/troubleshooting#network",
                     ),
                 );
             }

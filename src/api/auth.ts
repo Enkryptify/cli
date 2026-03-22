@@ -146,7 +146,7 @@ export class Auth {
                     if (!code) {
                         setTimeout(() => {
                             fail(new CLIError(
-                                "Authentication failed — no authorization was received.",
+                                "Authentication failed. No authorization was received.",
                                 "The browser did not return a valid authorization code. You may have denied access or the flow was interrupted.",
                                 'Run "ek login" to try again.',
                             ));
@@ -289,7 +289,7 @@ export class Auth {
         if (!data.accessToken) {
             throw new CLIError(
                 "Could not complete the login.",
-                "The server response was incomplete — no access token was provided.",
+                "The server response was incomplete. No access token was provided.",
                 'Run "ek login" to try again.',
             );
         }
