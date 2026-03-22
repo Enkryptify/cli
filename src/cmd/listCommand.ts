@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { client } from "@/api/client";
 import { showSecretsTable } from "@/ui/SecretsTable";
 import { type Command } from "commander";
@@ -22,8 +23,11 @@ export function registerListCommand(program: Command) {
 
                 await listSecretsCommand(mode);
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

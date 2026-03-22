@@ -1,5 +1,6 @@
 import { type ProjectConfig, config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { type Secret, client } from "@/api/client";
 import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { RunFlow } from "@/ui/RunFlow";
@@ -19,7 +20,7 @@ function replaceVariables(content: string, secrets: Secret[]): string {
             return value;
         }
 
-        process.stderr.write(`Warning: Variable "${varName}" not found in secrets, leaving unchanged.\n`);
+        logger.stderr.warn(`Variable "${varName}" was not found in your secrets and will be left unchanged.`);
         return match;
     });
 }
@@ -40,22 +41,26 @@ export async function runFileCommand(
     }
 
     if (fromCache && cacheReason === "fallback") {
-        process.stderr.write(
-            "⚠️  Could not reach the API. Using cached secrets as fallback. Use --skip-cache to disable.\n",
+        logger.stderr.warn(
+            "Could not reach the Enkryptify API — using cached secrets as a fallback. Use --skip-cache to disable.",
         );
     } else if (fromCache) {
-        process.stderr.write("⚡ Using cached secrets. Use --skip-cache to force a fresh fetch.\n");
+        logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");
     }
 
     const successMessage = options?.env
-        ? `Secrets loaded successfully for environment "${options.env}".\n`
-        : "Secrets loaded successfully.\n";
-    process.stderr.write(successMessage);
+        ? `Secrets loaded successfully for environment "${options.env}".`
+        : "Secrets loaded successfully.";
+    logger.stderr.success(successMessage);
 
     const file = Bun.file(filePath);
     const exists = await file.exists();
     if (!exists) {
-        throw new Error(`File not found: ${filePath}`);
+        throw new CLIError(
+            `File not found: ${filePath}`,
+            undefined,
+            "Check the file path and try again.",
+        );
     }
 
     const content = await file.text();
@@ -74,7 +79,7 @@ export function registerRunFileCommand(program: Command) {
         .action(async (opts: { file: string; env?: string; skipCache?: boolean; offline?: boolean }) => {
             try {
                 if (opts.skipCache && opts.offline) {
-                    throw new Error("--skip-cache and --offline cannot be used together.");
+                    throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
                 }
 
                 const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
@@ -91,8 +96,11 @@ export function registerRunFileCommand(program: Command) {
                     },
                 });
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

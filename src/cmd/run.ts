@@ -1,5 +1,6 @@
 import { type ProjectConfig, config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { buildEnvWithSecrets } from "@/lib/inject";
 import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { client } from "@/api/client";
@@ -25,11 +26,11 @@ export async function runCommand(
     }
 
     if (fromCache && cacheReason === "fallback") {
-        process.stderr.write(
-            "⚠️  Could not reach the API. Using cached secrets as fallback. Use --skip-cache to disable.\n",
+        logger.stderr.warn(
+            "Could not reach the Enkryptify API — using cached secrets as a fallback. Use --skip-cache to disable.",
         );
     } else if (fromCache) {
-        process.stderr.write("⚡ Using cached secrets. Use --skip-cache to force a fresh fetch.\n");
+        logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");
     }
 
     let successMessage = "Secrets injected successfully";
@@ -41,17 +42,17 @@ export async function runCommand(
             ? ` environment "${options.env}"`
             : ` for environment "${options.env}"`;
     }
-    successMessage += ".\n";
-    process.stderr.write(successMessage);
+    successMessage += ".";
+    logger.stderr.success(successMessage);
 
     if (cmd.length === 0) {
-        throw new Error("Command is required. Please provide a command to run.");
+        throw CLIError.from("COMMAND_MISSING");
     }
 
     const [bin, ...args] = cmd;
 
     if (!bin) {
-        throw new Error("Command is required. Please provide a command to run.");
+        throw CLIError.from("COMMAND_MISSING");
     }
 
     const proc = Bun.spawn([bin, ...args], {
@@ -63,7 +64,10 @@ export async function runCommand(
 
     const exitCode = await proc.exited;
     if (exitCode !== 0) {
-        throw new Error(`Command exited with code ${exitCode}`);
+        throw new CLIError(
+            `Your command exited with code ${exitCode}.`,
+            "The command you ran returned a non-zero exit code, which usually indicates an error.",
+        );
     }
 }
 
@@ -82,11 +86,11 @@ export function registerRunCommand(program: Command) {
         .action(async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
             try {
                 if (opts.project && !opts.env) {
-                    throw new Error("The --env option is required when using --project.");
+                    throw CLIError.from("ENV_REQUIRED_WITH_PROJECT");
                 }
 
                 if (opts.skipCache && opts.offline) {
-                    throw new Error("--skip-cache and --offline cannot be used together.");
+                    throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
                 }
 
                 const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
@@ -105,8 +109,11 @@ export function registerRunCommand(program: Command) {
                     },
                 });
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

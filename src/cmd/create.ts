@@ -1,8 +1,8 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { getSecureInput } from "@/lib/input";
 import { client } from "@/api/client";
-import { showMessage } from "@/ui/SuccessMessage";
 import { type CreateSecretInput, createSecretSchema } from "@/validators/secret";
 import type { Command } from "commander";
 import { z } from "zod";
@@ -25,7 +25,7 @@ export async function createSecretCommand(name: string, value: string): Promise<
 
     await client.createSecret(projectConfig, validName, validValue);
 
-    showMessage(`Secret created successfully! Name: ${validName}`);
+    logger.success(`Secret created successfully! Name: ${validName}`);
 }
 
 export function registerCreateCommand(program: Command) {
@@ -47,7 +47,11 @@ export function registerCreateCommand(program: Command) {
 
                 await createSecretCommand(name, secretValue);
             } catch (error: unknown) {
-                logError(error instanceof Error ? error.message : String(error));
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

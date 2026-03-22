@@ -1,3 +1,4 @@
+import { PREFIX } from "@/lib/logger";
 import ansiEscapes from "ansi-escapes";
 import { Box, Text, render } from "ink";
 import Spinner from "ink-spinner";
@@ -20,7 +21,7 @@ function SpinnerComponent({ message }: { message: string }) {
 }
 
 export async function RunFlow({ envName, projectName, run }: RunFlowProps): Promise<void> {
-    let loadingMessage = "Injecting secrets";
+    let loadingMessage = `${PREFIX} Injecting secrets`;
     if (projectName) {
         loadingMessage += ` for project "${projectName}"`;
     }

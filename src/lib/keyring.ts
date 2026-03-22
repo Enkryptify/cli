@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import * as keytar from "keytar";
 
 const SERVICE_NAME = "enkryptify-cli";
@@ -14,7 +15,7 @@ class OSKeyring implements Keyring {
         try {
             await keytar.setPassword(SERVICE_NAME, key, value);
         } catch (error: unknown) {
-            console.warn(error instanceof Error ? error.message : String(error));
+            logger.debug(`Keyring set failed: ${error instanceof Error ? error.message : String(error)}`);
             throw error;
         }
     }
@@ -24,7 +25,7 @@ class OSKeyring implements Keyring {
             const value = await keytar.getPassword(SERVICE_NAME, key);
             return value;
         } catch (error: unknown) {
-            console.warn(error instanceof Error ? error.message : String(error));
+            logger.debug(`Keyring get failed: ${error instanceof Error ? error.message : String(error)}`);
             return null;
         }
     }
@@ -33,7 +34,7 @@ class OSKeyring implements Keyring {
         try {
             await keytar.deletePassword(SERVICE_NAME, key);
         } catch (error: unknown) {
-            console.warn(error instanceof Error ? error.message : String(error));
+            logger.debug(`Keyring delete failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 

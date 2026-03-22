@@ -1,4 +1,4 @@
-import { logError } from "@/lib/error";
+import { logger } from "@/lib/logger";
 import { LoginFlow } from "@/ui/LoginFlow";
 import type { Command } from "commander";
 
@@ -13,7 +13,7 @@ export function registerLoginCommand(program: Command) {
                     force: options.force,
                 },
                 onError: (error: Error) => {
-                    logError(error instanceof Error ? error.message : String(error));
+                    logger.error(error instanceof Error ? error.message : String(error));
                     process.exit(1);
                 },
             });

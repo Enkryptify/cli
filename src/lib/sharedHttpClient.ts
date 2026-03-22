@@ -1,4 +1,6 @@
+import { CLIError } from "@/lib/errors";
 import { keyring } from "@/lib/keyring";
+import { logger } from "@/lib/logger";
 import axios, { type AxiosError, type AxiosInstance } from "axios";
 
 type StoredAuthData = {
@@ -11,15 +13,46 @@ export type HttpClientConfig = {
     keyringKey: string;
     authHeaderName: string;
     authHeaderPrefix?: string;
-    errorMessages?: Record<number, string>;
 };
 
-const DEFAULT_ERROR_MESSAGES: Record<number, string> = {
-    401: "Authentication failed. Please check your credentials.",
-    404: "Resource not found.",
-    403: "You don't have permission to perform this action.",
-    500: "Something went wrong on the server. Please try again later.",
+type ErrorEntry = {
+    message: string;
+    why: string;
+    fix: string;
+    docs?: string;
 };
+
+const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
+    401: {
+        message: "Authentication failed.",
+        why: "Your session has expired or your credentials are invalid.",
+        fix: 'Run "ek login" to re-authenticate.',
+        docs: "/cli/auth",
+    },
+    403: {
+        message: "Access denied.",
+        why: "Your account doesn't have permission to access this resource.",
+        fix: "Check your role and permissions in the Enkryptify dashboard.",
+    },
+    404: {
+        message: "The requested resource was not found.",
+        why: "The workspace, project, environment, or secret you're trying to access doesn't exist.",
+        fix: 'Run "ek configure" to update your project settings.',
+    },
+    500: {
+        message: "The Enkryptify server encountered an error.",
+        why: "This is a server-side issue, not a problem with your setup.",
+        fix: "Try again in a few minutes. If the problem persists, contact support.",
+    },
+};
+
+const NETWORK_ERROR_CODES = new Set([
+    "ECONNREFUSED",
+    "ECONNRESET",
+    "ENOTFOUND",
+    "ETIMEDOUT",
+    "ERR_NETWORK",
+]);
 
 export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosInstance {
     const http = axios.create({
@@ -54,7 +87,7 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
                     requestConfig.headers[config.authHeaderName] = authValue;
                 }
             } catch (error) {
-                console.warn("Failed to retrieve auth token:", error instanceof Error ? error.message : String(error));
+                logger.debug(`Failed to retrieve auth token: ${error instanceof Error ? error.message : String(error)}`);
             }
 
             return requestConfig;
@@ -62,15 +95,25 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
         (error) => Promise.reject(error),
     );
 
-    const errorMessages = config.errorMessages ?? DEFAULT_ERROR_MESSAGES;
-
     http.interceptors.response.use(
         (response) => response,
         async (error: AxiosError) => {
-            const status = error.response?.status;
+            // Handle network-level errors (ECONNREFUSED, ETIMEDOUT, etc.)
+            if ((error.code && NETWORK_ERROR_CODES.has(error.code)) || !error.response) {
+                return Promise.reject(
+                    new CLIError(
+                        "Could not connect to the Enkryptify API.",
+                        "The API server is unreachable. This could be a network issue, firewall, or the server may be down.",
+                        'Check your internet connection and try again. Use "ek run --offline" to use cached secrets.',
+                        "/cli/troubleshooting",
+                    ),
+                );
+            }
 
-            if (status && errorMessages[status]) {
-                return Promise.reject(new Error(errorMessages[status]));
+            const status = error.response?.status;
+            if (status && HTTP_ERROR_MAP[status]) {
+                const entry = HTTP_ERROR_MAP[status];
+                return Promise.reject(new CLIError(entry.message, entry.why, entry.fix, entry.docs));
             }
 
             return Promise.reject(error);

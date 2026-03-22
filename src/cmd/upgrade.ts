@@ -1,5 +1,6 @@
 import { env } from "@/env";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { fetchLatestVersion } from "@/lib/versionCheck";
 import type { Command } from "commander";
 import { execSync } from "child_process";
@@ -47,23 +48,27 @@ function getPlatformArch(): { platform: string; arch: string; ext: string } | nu
 }
 
 async function upgradeViaBrew(): Promise<void> {
-    console.log("Upgrading via Homebrew...\n");
+    logger.info("Upgrading via Homebrew...");
     try {
         execSync("brew update && brew upgrade enkryptify", { stdio: "inherit" });
-        console.log("\n✅ Successfully upgraded via Homebrew.");
+        logger.success("Successfully upgraded via Homebrew.");
     } catch {
-        logError("Failed to upgrade via Homebrew. Try running manually:\n  brew update && brew upgrade enkryptify");
+        logger.error("Homebrew upgrade failed.", {
+            fix: "Try running manually: brew update && brew upgrade enkryptify",
+        });
         process.exit(1);
     }
 }
 
 async function upgradeViaScoop(): Promise<void> {
-    console.log("Upgrading via Scoop...\n");
+    logger.info("Upgrading via Scoop...");
     try {
         execSync("scoop update enkryptify", { stdio: "inherit" });
-        console.log("\n✅ Successfully upgraded via Scoop.");
+        logger.success("Successfully upgraded via Scoop.");
     } catch {
-        logError("Failed to upgrade via Scoop. Try running manually:\n  scoop update enkryptify");
+        logger.error("Scoop upgrade failed.", {
+            fix: "Try running manually: scoop update enkryptify",
+        });
         process.exit(1);
     }
 }
@@ -72,15 +77,15 @@ async function upgradeViaBinary(latestVersion: string): Promise<void> {
     // Windows direct binary: show manual instructions
     if (process.platform === "win32") {
         const url = `${GITHUB_DOWNLOAD_BASE}/v${latestVersion}/enkryptify_Windows_x86_64.zip`;
-        console.log(`Download the latest version manually:\n  ${url}`);
+        logger.info(`Download the latest version manually:\n  ${url}`);
         return;
     }
 
     const info = getPlatformArch();
     if (!info) {
-        logError(
-            `Unsupported platform: ${process.platform}/${process.arch}\n` +
-                `  Please upgrade manually from: https://github.com/Enkryptify/cli/releases`,
+        logger.error(
+            `Automatic upgrade is not available for your platform (${process.platform}/${process.arch}).`,
+            { fix: "Download the latest version manually: https://github.com/Enkryptify/cli/releases" },
         );
         process.exit(1);
     }
@@ -88,7 +93,7 @@ async function upgradeViaBinary(latestVersion: string): Promise<void> {
     const fileName = `enkryptify_${info.platform}_${info.arch}.${info.ext}`;
     const downloadUrl = `${GITHUB_DOWNLOAD_BASE}/v${latestVersion}/${fileName}`;
 
-    console.log(`Downloading ${fileName}...`);
+    logger.info(`Downloading ${fileName}...`);
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ek-upgrade-"));
 
@@ -107,7 +112,7 @@ async function upgradeViaBinary(latestVersion: string): Promise<void> {
 
         const extractedBinary = path.join(tmpDir, "ek");
         if (!fs.existsSync(extractedBinary)) {
-            throw new Error("Binary not found in archive.");
+            throw CLIError.from("UPGRADE_CORRUPTED");
         }
 
         // Replace the current binary
@@ -118,15 +123,12 @@ async function upgradeViaBinary(latestVersion: string): Promise<void> {
             fs.chmodSync(targetPath, 0o755);
         } catch (err: unknown) {
             if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "EACCES") {
-                logError(
-                    `Permission denied. Try running:\n  sudo ek upgrade`,
-                );
-                process.exit(1);
+                throw CLIError.from("UPGRADE_PERMISSION_DENIED");
             }
             throw err;
         }
 
-        console.log(`\n✅ Successfully upgraded to v${latestVersion}.`);
+        logger.success(`Successfully upgraded to v${latestVersion}.`);
     } finally {
         // Clean up temp directory
         try {
@@ -146,31 +148,28 @@ export function registerUpgradeCommand(program: Command) {
             try {
                 const currentVersion = env.CLI_VERSION;
 
-                console.log(`Current version: v${currentVersion}\n`);
-                console.log("Checking for updates...");
+                logger.info(`Current version: v${currentVersion}`);
+                logger.info("Checking for updates...");
 
                 const latestVersion = await fetchLatestVersion();
 
                 if (!latestVersion) {
-                    logError(
-                        "Failed to check for updates. Please check your internet connection.",
-                    );
-                    process.exit(1);
+                    throw CLIError.from("UPGRADE_CHECK_FAILED");
                 }
 
                 if (semver.eq(currentVersion, latestVersion) && !options.force) {
-                    console.log(`\n✅ Already on the latest version (v${currentVersion}).`);
+                    logger.success(`Already on the latest version (v${currentVersion}).`);
                     return;
                 }
 
                 if (semver.gt(currentVersion, latestVersion) && !options.force) {
-                    console.log(
-                        `\n✅ Current version (v${currentVersion}) is newer than latest release (v${latestVersion}).`,
+                    logger.success(
+                        `Current version (v${currentVersion}) is newer than latest release (v${latestVersion}).`,
                     );
                     return;
                 }
 
-                console.log(`Upgrading: v${currentVersion} → v${latestVersion}\n`);
+                logger.info(`Upgrading: v${currentVersion} → v${latestVersion}`);
 
                 const method = detectInstallMethod();
 
@@ -186,8 +185,11 @@ export function registerUpgradeCommand(program: Command) {
                         break;
                 }
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });
