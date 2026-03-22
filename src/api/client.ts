@@ -469,12 +469,18 @@ class EnkryptifyClient {
             if (error instanceof AxiosError) {
                 const status = error.response?.status;
                 if (status) {
+                    if (status === 401) throw CLIError.from("API_UNAUTHORIZED");
+                    if (status === 403) throw CLIError.from("API_FORBIDDEN");
+                    if (status === 404) throw CLIError.from("API_NOT_FOUND");
+                    if (status >= 500) throw CLIError.from("API_SERVER_ERROR");
                     throw new CLIError(
                         "Could not load data from the Enkryptify API.",
                         `The server returned an error (status ${status}).`,
                         'Check your permissions and try again. Run "ek login" if the issue persists.',
                     );
                 }
+                // Network-level errors (timeout, DNS, offline, etc.)
+                throw CLIError.from("API_NETWORK_ERROR");
             }
             throw error;
         }
