@@ -1,5 +1,6 @@
 import { registerCommands } from "@/cmd/index";
 import { env } from "@/env";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { setupTerminalCleanup } from "@/lib/terminal";
@@ -36,17 +37,25 @@ if (isCompletion) {
 }
 
 setupTerminalCleanup();
+await analytics.init();
 
 const isUpgrade = process.argv[2] === "upgrade";
 if (!isCompletion && !isUpgrade) {
     checkForUpdate().catch(() => {});
 }
 
-program.parseAsync(process.argv).catch((error) => {
-    if (error instanceof CLIError) {
-        logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
-    } else {
-        logger.error(error instanceof Error ? error.message : String(error));
-    }
-    process.exit(1);
-});
+program
+    .parseAsync(process.argv)
+    .catch((error) => {
+        if (error instanceof CLIError) {
+            analytics.track("cli_error", { error_code: error.errorCode, error_message: error.message });
+            logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+        } else {
+            analytics.track("cli_error", { error_message: error instanceof Error ? error.message : String(error) });
+            logger.error(error instanceof Error ? error.message : String(error));
+        }
+        process.exitCode = 1;
+    })
+    .finally(async () => {
+        await analytics.shutdown();
+    });

@@ -1,4 +1,5 @@
 import { type ProjectConfig, config } from "@/lib/config";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { buildEnvWithSecrets } from "@/lib/inject";
@@ -11,7 +12,7 @@ export async function runCommand(
     projectconfig: ProjectConfig,
     cmd: string[],
     options?: { env?: string; project?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
-): Promise<void> {
+): Promise<{ fromCache: boolean; cacheReason?: string; exitCode: number }> {
     const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
         projectconfig,
         { env: options?.env, project: options?.project },
@@ -67,6 +68,8 @@ export async function runCommand(
             "The command you ran returned a non-zero exit code, which usually indicates an error.",
         );
     }
+
+    return { fromCache, cacheReason, exitCode };
 }
 
 export function registerRunCommand(program: Command) {
@@ -83,6 +86,13 @@ export function registerRunCommand(program: Command) {
         )
         .action(
             async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
+                const tracker = analytics.trackCommand("command_run", {
+                    has_env_flag: !!opts.env,
+                    has_project_flag: !!opts.project,
+                    skip_cache: !!opts.skipCache,
+                    offline: !!opts.offline,
+                });
+
                 try {
                     if (opts.project && !opts.env) {
                         throw CLIError.from("ENV_REQUIRED_WITH_PROJECT");
@@ -94,11 +104,13 @@ export function registerRunCommand(program: Command) {
 
                     const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
 
+                    let result: { fromCache: boolean; cacheReason?: string; exitCode: number } | undefined;
+
                     await RunFlow({
                         envName: opts.env,
                         projectName: opts.project,
                         run: async (unmountSpinner) => {
-                            await runCommand(projectConfig, cmd, {
+                            result = await runCommand(projectConfig, cmd, {
                                 env: opts.env,
                                 project: opts.project,
                                 noCache: opts.skipCache,
@@ -107,7 +119,15 @@ export function registerRunCommand(program: Command) {
                             });
                         },
                     });
+
+                    tracker.success({
+                        workspace_slug: projectConfig.workspace_slug,
+                        from_cache: result?.fromCache,
+                        cache_reason: result?.cacheReason,
+                        exit_code: result?.exitCode ?? 0,
+                    });
                 } catch (error) {
+                    tracker.error(error);
                     if (error instanceof CLIError) {
                         logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
                     } else {

@@ -1,4 +1,5 @@
 import { config } from "@/lib/config";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { getSecureInput } from "@/lib/input";
@@ -38,6 +39,8 @@ export function registerCreateCommand(program: Command) {
             'Secret value. Use quotes for values with spaces or special characters. Example: ek secret create <name> "my value!@#$%^&*()"',
         )
         .action(async (name: string, value?: string) => {
+            const tracker = analytics.trackCommand("command_secret_create");
+
             try {
                 let secretValue = value ?? "";
 
@@ -46,7 +49,16 @@ export function registerCreateCommand(program: Command) {
                 }
 
                 await createSecretCommand(name, secretValue);
+
+                // Best-effort workspace_slug for analytics
+                try {
+                    const projectConfig = await config.findProjectConfig(process.cwd());
+                    tracker.success({ workspace_slug: projectConfig.workspace_slug });
+                } catch {
+                    tracker.success();
+                }
             } catch (error: unknown) {
+                tracker.error(error);
                 if (error instanceof CLIError) {
                     logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
                 } else {

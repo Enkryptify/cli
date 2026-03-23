@@ -132,7 +132,11 @@ describe("runCommand (integration)", () => {
     it("returns successfully when subprocess exits 0", async () => {
         mockSpawn.mockReturnValue({ exited: Promise.resolve(0) });
 
-        await expect(runCommand(FAKE_PROJECT_CONFIG, ["true"])).resolves.toBeUndefined();
+        await expect(runCommand(FAKE_PROJECT_CONFIG, ["true"])).resolves.toEqual({
+            fromCache: false,
+            cacheReason: undefined,
+            exitCode: 0,
+        });
     });
 
     // --- Dangerous env vars ---

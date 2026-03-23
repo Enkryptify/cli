@@ -1,4 +1,5 @@
 import { type ProjectConfig, config } from "@/lib/config";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { type Secret, client } from "@/api/client";
@@ -74,6 +75,12 @@ export function registerRunFileCommand(program: Command) {
         .option("--skip-cache", "Skip cache and always fetch fresh secrets from the API")
         .option("--offline", "Use cached secrets without contacting the API")
         .action(async (opts: { file: string; env?: string; skipCache?: boolean; offline?: boolean }) => {
+            const tracker = analytics.trackCommand("command_run_file", {
+                has_env_flag: !!opts.env,
+                skip_cache: !!opts.skipCache,
+                offline: !!opts.offline,
+            });
+
             try {
                 if (opts.skipCache && opts.offline) {
                     throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
@@ -92,7 +99,12 @@ export function registerRunFileCommand(program: Command) {
                         });
                     },
                 });
+
+                tracker.success({
+                    workspace_slug: projectConfig.workspace_slug,
+                });
             } catch (error) {
+                tracker.error(error);
                 if (error instanceof CLIError) {
                     logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
                 } else {

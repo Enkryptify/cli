@@ -1,4 +1,5 @@
 import { config } from "@/lib/config";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import http from "@/api/httpClient";
@@ -11,8 +12,11 @@ export function registerSdkCommand(program: Command): void {
         .allowUnknownOption()
         .allowExcessArguments()
         .action(async (_options, cmd: Command) => {
+            const tracker = analytics.trackCommand("command_sdk");
+
             const args = cmd.args as string[];
             if (args.length === 0) {
+                tracker.error(new Error("No command provided"));
                 logger.error("No command provided.", {
                     fix: "Usage: ek sdk -- <command>",
                 });
@@ -28,6 +32,7 @@ export function registerSdkCommand(program: Command): void {
             }
 
             if (!setup) {
+                tracker.error(new Error("No project configured"));
                 logger.error("No project configured in this directory.", {
                     fix: 'Run "ek configure" to set up your project first.',
                     docs: "/cli/troubleshooting#configuration",
@@ -44,6 +49,7 @@ export function registerSdkCommand(program: Command): void {
                 );
                 token = data.token;
             } catch (error) {
+                tracker.error(error);
                 if (error instanceof CLIError) {
                     logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
                 } else {
@@ -55,6 +61,7 @@ export function registerSdkCommand(program: Command): void {
             // 3. Spawn child process with token injected
             const [bin, ...rest] = args;
             if (!bin) {
+                tracker.error(new Error("No command provided"));
                 logger.error("No command provided.", {
                     fix: "Usage: ek sdk -- <command>",
                 });
@@ -69,6 +76,7 @@ export function registerSdkCommand(program: Command): void {
             });
 
             const exitCode = await proc.exited;
+            tracker.success({ workspace_slug: setup.workspace_slug });
             process.exit(exitCode);
         });
 }

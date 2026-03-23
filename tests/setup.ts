@@ -1,5 +1,8 @@
 import { vi } from "vitest";
 
+// Disable analytics in all tests
+process.env.EK_TELEMETRY = "false";
+
 // Mock keytar globally -- native module unavailable in CI
 vi.mock("keytar", () => ({
     setPassword: vi.fn(),
