@@ -12,6 +12,16 @@ type StoredAuthData = {
     email: string;
 };
 
+function isValidStoredAuthData(value: unknown): value is StoredAuthData {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        typeof (value as Record<string, unknown>).accessToken === "string" &&
+        typeof (value as Record<string, unknown>).userId === "string" &&
+        typeof (value as Record<string, unknown>).email === "string"
+    );
+}
+
 export type CommandTracker = {
     success(properties?: Record<string, unknown>): void;
     error(error: unknown): void;
@@ -105,9 +115,9 @@ export const analytics = {
             try {
                 const authDataString = await keyring.get("enkryptify");
                 if (authDataString) {
-                    const authData = JSON.parse(authDataString) as StoredAuthData;
-                    if (authData.userId) {
-                        distinctId = authData.userId;
+                    const parsed: unknown = JSON.parse(authDataString);
+                    if (isValidStoredAuthData(parsed)) {
+                        distinctId = parsed.userId;
                     }
                 }
             } catch {
@@ -137,12 +147,12 @@ export const analytics = {
                 try {
                     const authDataString = await keyring.get("enkryptify");
                     if (authDataString) {
-                        const authData = JSON.parse(authDataString) as StoredAuthData;
-                        if (authData.userId && authData.email) {
+                        const parsed: unknown = JSON.parse(authDataString);
+                        if (isValidStoredAuthData(parsed)) {
                             posthog.identify({
-                                distinctId: authData.userId,
+                                distinctId: parsed.userId,
                                 properties: {
-                                    email: authData.email,
+                                    email: parsed.email,
                                 },
                             });
                         }
