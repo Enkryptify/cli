@@ -77,6 +77,13 @@ export const CLI_ERRORS = {
         fix: "Close the application using that port and try again.",
     },
 
+    // Logout
+    LOGOUT_REVOKE_FAILED: {
+        message: "Could not revoke your token on the server.",
+        why: "The server may be unreachable or the token may already be invalid.",
+        fix: "Your local credentials have been cleared. If needed, revoke tokens from the Enkryptify dashboard.",
+    },
+
     // Configuration
     CONFIG_NOT_FOUND: {
         message: "No project configured for this directory.",

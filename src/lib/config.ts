@@ -179,6 +179,12 @@ async function markAuthenticated(): Promise<void> {
     await saveConfig(config);
 }
 
+async function clearAuthentication(): Promise<void> {
+    const config = await loadConfig();
+    delete config.providers["enkryptify"];
+    await saveConfig(config);
+}
+
 async function isAuthenticated(): Promise<boolean> {
     const config = await loadConfig();
     return config.providers?.["enkryptify"] != null;
@@ -227,6 +233,7 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
 
 export const config = {
     markAuthenticated,
+    clearAuthentication,
     isAuthenticated,
     createConfigure,
     getConfigure,
