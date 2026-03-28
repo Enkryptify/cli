@@ -142,23 +142,25 @@ export function buildEnvWithSecrets(
     for (const secret of secrets) {
         if (!secret?.name || secret.value == null) continue;
 
-        if (!options?.allowDangerousVars && isDangerousEnvVar(secret.name)) {
+        const envName = options?.prefix ? `${options.prefix}${secret.name}` : secret.name;
+
+        if (!options?.allowDangerousVars && isDangerousEnvVar(envName)) {
             logger.warn(
-                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${secret.name.toUpperCase()}).`,
+                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${envName.toUpperCase()}).`,
             );
-            skippedSecrets.push(secret.name);
+            skippedSecrets.push(envName);
             continue;
         }
 
         if (secret.name.includes("\0")) {
             logger.warn(`Secret "${secret.name}" was skipped. The name contains invalid characters.`);
-            skippedSecrets.push(secret.name);
+            skippedSecrets.push(envName);
             continue;
         }
 
         if (typeof secret.value !== "string" || secret.value.includes("\0")) {
             logger.warn(`Secret "${secret.name}" was skipped. The value is invalid.`);
-            skippedSecrets.push(secret.name);
+            skippedSecrets.push(envName);
             continue;
         }
 
@@ -168,7 +170,6 @@ export function buildEnvWithSecrets(
             );
         }
 
-        const envName = options?.prefix ? `${options.prefix}${secret.name}` : secret.name;
         env[envName] = secret.value;
         injectedCount++;
     }
