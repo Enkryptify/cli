@@ -157,6 +157,7 @@ export function registerRunCommand(program: Command) {
                         cache_reason: result?.cacheReason,
                         exit_code: result?.exitCode ?? 0,
                     });
+                    process.exit(result?.exitCode ?? 0);
                 } catch (error) {
                     tracker.error(error);
                     if (error instanceof CLIError) {

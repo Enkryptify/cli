@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { isDangerousEnvVar } from "@/lib/inject";
 import { logger } from "@/lib/logger";
+import { writeStdout } from "@/lib/stdout";
 import { type Secret, client } from "@/api/client";
 import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { RunFlow } from "@/ui/RunFlow";
@@ -80,7 +81,7 @@ export async function runFileCommand(
     const processedContent = replaceVariables(content, secrets, {
         allowDangerousVars: options?.allowDangerousVars,
     });
-    process.stdout.write(processedContent);
+    await writeStdout(processedContent);
 }
 
 export function registerRunFileCommand(program: Command) {
@@ -133,6 +134,7 @@ export function registerRunFileCommand(program: Command) {
                     tracker.success({
                         workspace_slug: projectConfig.workspace_slug,
                     });
+                    process.exit(0);
                 } catch (error) {
                     tracker.error(error);
                     if (error instanceof CLIError) {

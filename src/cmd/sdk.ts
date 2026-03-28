@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { createSdkToken } from "@/lib/sdkToken";
+import { writeStdout } from "@/lib/stdout";
 import type { Command } from "commander";
 
 export function registerSdkCommand(program: Command): void {
@@ -57,13 +58,9 @@ export function registerSdkCommand(program: Command): void {
 
             // 3. Stdout mode: print token and exit
             if (options.output === "stdout") {
-                if (process.stdout.isTTY) {
-                    process.stdout.write(`${token}\n`);
-                } else {
-                    process.stdout.write(token);
-                }
+                await writeStdout(process.stdout.isTTY ? `${token}\n` : token);
                 tracker.success({ workspace_slug: setup.workspace_slug });
-                return;
+                process.exit(0);
             }
 
             // 4. Env mode (default): require command args, spawn subprocess
