@@ -1,17 +1,40 @@
-# TODOs
+# Enkryptify CLI
 
-[x] Add `ek upgrade` to update the CLI
-[ ] Move all CRUD secrets to `ek secret` command
-[ ] Add cache to `ek run` command (in keyring)
-[ ] Rework entire logging system -> better errors (with clear next steps + links to docs)
-[x] Auto reminder to update the CLI
-[x] Better ways to debug CLI
-[x] Rework CI/CD pipelines
-    - Make it faster (cache + blacksmith)
-    - Add extra security checks (betterleaks, safechain, audit, ...)
-[x] Remove setApiUrl command
-[x] Fix bug in install script
-[x] Change license to MIT
-[] Add PostHog logging for analytics
-[x] Add script to run to debug CLI (creates binary and sets it as `ek-dev` in /usr/local/bin)
-    - With parameters to set API and APP urls
+The official CLI for [Enkryptify](https://enkryptify.com) — manage and inject secrets into your development workflow.
+
+## Install
+
+**Linux / macOS:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Enkryptify/cli/main/install.sh | bash
+```
+
+**macOS (Homebrew):**
+
+```bash
+brew install enkryptify/enkryptify/enkryptify
+```
+
+**Windows (Scoop):**
+
+```powershell
+scoop bucket add enkryptify https://github.com/Enkryptify/scoop-enkryptify
+scoop install enkryptify
+```
+
+## Quick start
+
+```bash
+ek login
+ek configure
+ek run -- your-command
+```
+
+## Documentation
+
+For usage guides, command reference, and configuration: **[docs.enkryptify.com](https://docs.enkryptify.com)**
+
+## License
+
+[MIT](LICENSE)

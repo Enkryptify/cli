@@ -1,5 +1,6 @@
 import type { Secret } from "@/api/client";
 import type { ProjectConfig } from "@/lib/config";
+import { CLIError } from "@/lib/errors";
 import { keyring } from "@/lib/keyring";
 
 const CACHE_TTL_MS = 10_000; // 10 seconds
@@ -81,9 +82,10 @@ export async function fetchSecretsWithCache(
     if (cacheOptions.offline) {
         const cached = await readCache(cacheKey);
         if (!cached) {
-            throw new Error(
-                "No cached secrets available for offline mode. " +
-                    "Run 'ek run' at least once while online to populate the cache.",
+            throw new CLIError(
+                "No cached secrets available.",
+                "You're in offline mode but no secrets have been cached yet.",
+                'Run "ek run" at least once while online to populate the cache.',
             );
         }
         return { secrets: cached.secrets, fromCache: true, cacheReason: "offline" };

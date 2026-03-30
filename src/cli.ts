@@ -1,6 +1,7 @@
 import { registerCommands } from "@/cmd/index";
 import { env } from "@/env";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { setupTerminalCleanup } from "@/lib/terminal";
 import { checkForUpdate } from "@/lib/versionCheck";
 
@@ -15,9 +16,9 @@ program.configureOutput({
     writeErr: (str) => {
         const errorMatch = str.match(/error:\s*(.+)/i);
         if (errorMatch && errorMatch[1]) {
-            logError(errorMatch[1].trim());
+            logger.error(errorMatch[1].trim());
         } else {
-            logError(str.trim());
+            logger.error(str.trim());
         }
     },
 });
@@ -29,7 +30,8 @@ registerCommands(program);
 if (isCompletion) {
     const words = process.argv.slice(3);
     const completions = getCompletions(program, ["ek", ...words]);
-    console.log(completions.join("\n"));
+    // Shell completions must go to stdout raw — not through the logger
+    process.stdout.write(completions.join("\n") + "\n");
     process.exit(0);
 }
 
@@ -41,6 +43,10 @@ if (!isCompletion && !isUpgrade) {
 }
 
 program.parseAsync(process.argv).catch((error) => {
-    logError(error instanceof Error ? error.message : String(error));
+    if (error instanceof CLIError) {
+        logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+    } else {
+        logger.error(error instanceof Error ? error.message : String(error));
+    }
     process.exit(1);
 });

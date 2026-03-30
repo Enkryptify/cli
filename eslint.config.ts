@@ -34,6 +34,7 @@ export default [
             "@typescript-eslint": tsPlugin,
         },
         rules: {
+            "no-console": "error",
             "no-debugger": "error",
             "no-duplicate-imports": "error",
             "prefer-const": "error",
@@ -74,6 +75,13 @@ export default [
             ],
             "@typescript-eslint/no-misused-promises": "error",
             "@typescript-eslint/no-floating-promises": "error",
+        },
+    },
+
+    {
+        files: ["src/lib/logger.ts"],
+        rules: {
+            "no-console": "off",
         },
     },
 

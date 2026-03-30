@@ -1,4 +1,5 @@
 import type { Secret } from "@/api/client";
+import { logger } from "@/lib/logger";
 
 /**
  * Environment variables that should never be overridden by secrets
@@ -63,20 +64,19 @@ export function buildEnvWithSecrets(secrets: Secret[]): typeof process.env {
         if (!secret?.name || secret.value == null) continue;
 
         if (isDangerousEnvVar(secret.name)) {
-            console.warn(
-                `⚠️  Warning: Secret "${secret.name}" conflicts with a protected environment variable ` +
-                    `(${secret.name.toUpperCase()}). It will not be injected for security reasons.`,
+            logger.warn(
+                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${secret.name.toUpperCase()}).`,
             );
             continue;
         }
 
         if (secret.name.includes("\0")) {
-            console.warn(`⚠️  Warning: Secret name "${secret.name}" contains null bytes and will be skipped.`);
+            logger.warn(`Secret "${secret.name}" was skipped. The name contains invalid characters.`);
             continue;
         }
 
         if (typeof secret.value !== "string" || secret.value.includes("\0")) {
-            console.warn(`⚠️  Warning: Secret "${secret.name}" has an invalid value and will be skipped.`);
+            logger.warn(`Secret "${secret.name}" was skipped. The value is invalid.`);
             continue;
         }
         env[secret.name] = secret.value;

@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import http from "@/api/httpClient";
 import type { Command } from "commander";
 
@@ -12,7 +13,9 @@ export function registerSdkCommand(program: Command): void {
         .action(async (_options, cmd: Command) => {
             const args = cmd.args as string[];
             if (args.length === 0) {
-                logError("No command provided. Usage: ek sdk -- <command>");
+                logger.error("No command provided.", {
+                    fix: "Usage: ek sdk -- <command>",
+                });
                 process.exit(1);
             }
 
@@ -25,7 +28,10 @@ export function registerSdkCommand(program: Command): void {
             }
 
             if (!setup) {
-                logError("No Enkryptify project configured in this directory. Run `ek configure` first.");
+                logger.error("No project configured in this directory.", {
+                    fix: 'Run "ek configure" to set up your project first.',
+                    docs: "/cli/troubleshooting#configuration",
+                });
                 process.exit(1);
             }
 
@@ -38,14 +44,20 @@ export function registerSdkCommand(program: Command): void {
                 );
                 token = data.token;
             } catch (error) {
-                logError(error instanceof Error ? error.message : String(error));
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
 
             // 3. Spawn child process with token injected
             const [bin, ...rest] = args;
             if (!bin) {
-                logError("No command provided. Usage: ek sdk -- <command>");
+                logger.error("No command provided.", {
+                    fix: "Usage: ek sdk -- <command>",
+                });
                 process.exit(1);
             }
 

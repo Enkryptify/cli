@@ -1,4 +1,5 @@
 import type { Secret } from "@/api/client";
+import { logger } from "@/lib/logger";
 import { Box, Text, render, useStdout } from "ink";
 
 const MAX_ROWS_TO_DISPLAY = 100;
@@ -60,7 +61,7 @@ function SecretsList({ secrets }: { secrets: Secret[] }) {
 
 export function showSecretsTable(secrets: Secret[]): void {
     if (secrets.length === 0) {
-        console.log("No secrets found.");
+        logger.info("No secrets found in this environment.");
         return;
     }
 

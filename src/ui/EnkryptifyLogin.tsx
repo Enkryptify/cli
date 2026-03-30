@@ -1,5 +1,6 @@
 import type { LoginOptions } from "@/api/auth";
 import { client } from "@/api/client";
+import { PREFIX } from "@/lib/logger";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useEffect, useState } from "react";
@@ -17,10 +18,10 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage("Authenticating with Enkryptify...");
+                setMessage(`${PREFIX} Authenticating with Enkryptify...`);
                 await client.login(options);
                 setStatus("success");
-                setMessage("✓ Successfully authenticated with Enkryptify");
+                setMessage(`${PREFIX} Successfully authenticated with Enkryptify`);
 
                 setTimeout(() => {
                     onComplete?.();
@@ -28,7 +29,7 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
             } catch (error) {
                 const err = error instanceof Error ? error : new Error(String(error));
                 setStatus("error");
-                setMessage(`⚠️  ${err.message}`);
+                setMessage(`${PREFIX} ${err.message}`);
                 onError?.(err);
             }
         };
@@ -50,7 +51,7 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
 
                 {status === "success" && (
                     <Box marginTop={1}>
-                        <Text bold>{message}</Text>
+                        <Text bold color="green">{message}</Text>
                     </Box>
                 )}
 
@@ -65,7 +66,7 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
 
             {status === "loading" && (
                 <Box marginTop={1}>
-                    <Text>Please complete authentication in your browser...</Text>
+                    <Text>{PREFIX} Please complete authentication in your browser...</Text>
                 </Box>
             )}
         </>

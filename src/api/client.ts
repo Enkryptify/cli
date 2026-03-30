@@ -1,10 +1,11 @@
 import { type ProjectConfig, config } from "@/lib/config";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { getSecureInput, getTextInput } from "@/lib/input";
 import { Auth, type LoginOptions } from "@/api/auth";
 import http from "@/api/httpClient";
 import { confirm } from "@/ui/Confirm";
 import { selectName } from "@/ui/SelectItem";
-import { showMessage } from "@/ui/SuccessMessage";
 import { AxiosError } from "axios";
 
 export type Secret = {
@@ -109,7 +110,12 @@ class EnkryptifyClient {
         const workspaces = await this.fetchResource<Workspace>("/v1/workspace");
 
         if (workspaces.length === 0) {
-            throw new Error("No workspaces found. Please create a workspace first before setting up.");
+            throw new CLIError(
+                "No workspaces found.",
+                "Your account doesn't have any workspaces yet.",
+                "Create a workspace in the Enkryptify dashboard first.",
+                "/getting-started/quickstart",
+            );
         }
 
         const workspaceMap = new Map<string, Workspace>();
@@ -121,11 +127,21 @@ class EnkryptifyClient {
 
         const selectedWorkspaceLabel = await selectName(workspaceLabels, "Select workspace");
 
-        if (!selectedWorkspaceLabel) throw new Error("Failed to select workspace");
+        if (!selectedWorkspaceLabel) {
+            throw new CLIError(
+                "No workspace was selected.",
+                undefined,
+                "Please select a workspace from the list to continue.",
+            );
+        }
 
         const selectedWorkspace = workspaceMap.get(selectedWorkspaceLabel);
         if (!selectedWorkspace) {
-            throw new Error("Failed to find selected workspace");
+            throw new CLIError(
+                "The selected workspace could not be found.",
+                undefined,
+                'Try running "ek configure" again.',
+            );
         }
 
         const workspaceSlug = selectedWorkspace.slug;
@@ -140,8 +156,11 @@ class EnkryptifyClient {
         }
 
         if (allProjects.length === 0) {
-            throw new Error(
-                `No projects found in workspace "${selectedWorkspace.name}". Please create a project first before setting up.`,
+            throw new CLIError(
+                `No projects found in workspace "${selectedWorkspace.name}".`,
+                "This workspace doesn't have any projects yet.",
+                "Create a project in the Enkryptify dashboard.",
+                "/getting-started/quickstart",
             );
         }
 
@@ -154,11 +173,21 @@ class EnkryptifyClient {
 
         const selectedProjectLabel = await selectName(projectLabels, "Select project");
 
-        if (!selectedProjectLabel) throw new Error("Failed to select project");
+        if (!selectedProjectLabel) {
+            throw new CLIError(
+                "No project was selected.",
+                undefined,
+                "Please select a project from the list to continue.",
+            );
+        }
 
         const selectedProject = projectMap.get(selectedProjectLabel);
         if (!selectedProject) {
-            throw new Error("Failed to find selected project");
+            throw new CLIError(
+                "The selected project could not be found.",
+                undefined,
+                'Try running "ek configure" again.',
+            );
         }
 
         const projectSlug = selectedProject.slug;
@@ -168,8 +197,11 @@ class EnkryptifyClient {
         );
 
         if (environments.length === 0) {
-            throw new Error(
-                `No environments found in project "${selectedProject.name}". Please create an environment first before setting up.`,
+            throw new CLIError(
+                `No environments found in project "${selectedProject.name}".`,
+                "This project doesn't have any environments set up yet.",
+                "Create an environment in the project settings on the Enkryptify dashboard.",
+                "/getting-started/quickstart",
             );
         }
 
@@ -178,10 +210,22 @@ class EnkryptifyClient {
             "Select environment",
         );
 
-        if (!environmentName) throw new Error("Failed to select environment");
+        if (!environmentName) {
+            throw new CLIError(
+                "No environment was selected.",
+                undefined,
+                "Please select an environment from the list to continue.",
+            );
+        }
 
         const environmentId = environments.find((e) => e.name === environmentName)?.id;
-        if (!environmentId) throw new Error("Failed to find environment ID");
+        if (!environmentId) {
+            throw new CLIError(
+                "The selected environment could not be found.",
+                undefined,
+                'Try running "ek configure" again.',
+            );
+        }
 
         const projectConfig: ProjectConfig = {
             path: options,
@@ -190,7 +234,7 @@ class EnkryptifyClient {
             environment_id: environmentId,
         };
 
-        showMessage(
+        logger.success(
             `Setup completed successfully! Workspace: ${selectedWorkspace.name}, Project: ${selectedProject.name}, Environment: ${environmentName}`,
         );
 
@@ -206,8 +250,11 @@ class EnkryptifyClient {
             `/v1/workspace/${workspace_slug}/project/${targetProjectSlug}/environment`,
         );
         if (environments.length === 0) {
-            throw new Error(
-                `No environments found in project "${targetProjectSlug}". You can create an environment in the project settings`,
+            throw new CLIError(
+                `No environments found in project "${targetProjectSlug}".`,
+                "This project doesn't have any environments set up yet.",
+                "Create an environment in the project settings on the Enkryptify dashboard.",
+                "/getting-started/quickstart",
             );
         }
 
@@ -217,7 +264,11 @@ class EnkryptifyClient {
 
         if (!targetEnvironment) {
             const availableNames = environments.map((e) => e.name).join(", ");
-            throw new Error(`Environment "${targetEnvKey}" not found. Available environments: ${availableNames}`);
+            throw new CLIError(
+                `Environment "${targetEnvKey}" not found.`,
+                "The environment you specified doesn't exist in this project.",
+                `Available environments: ${availableNames}.`,
+            );
         }
 
         const targetEnvironmentId = targetEnvironment.id;
@@ -275,16 +326,24 @@ class EnkryptifyClient {
         const response = await http.get<ApiSecret[]>(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`);
 
         if (response.data.length === 0) {
-            throw new Error("No secrets found. Please create a secret first.");
+            throw new CLIError(
+                "No secrets found.",
+                "This project doesn't have any secrets in the current environment.",
+                'Use "ek create" to add a secret.',
+            );
         }
 
         if (!name || !name.trim()) {
-            throw new Error("Secret name is required. Please provide a secret name");
+            throw CLIError.from("VALIDATION_SECRET_NAME_REQUIRED");
         }
 
         const existingSecret = response.data.find((s) => s.name === name);
         if (!existingSecret) {
-            throw new Error(`Secret "${name}" not found.`);
+            throw new CLIError(
+                `Secret "${name}" not found.`,
+                "No secret with that name exists in the current environment.",
+                'Use "ek list" to see available secrets.',
+            );
         }
 
         const existingPersonalValue = existingSecret.values.find(
@@ -301,18 +360,27 @@ class EnkryptifyClient {
 
         const namePattern = /^[A-Za-z0-9_-]+$/;
         if (!namePattern.test(newName)) {
-            throw new Error(
-                `Invalid secret name "${newName}". Name can only contain A-Z, a-z, 0-9, underscore (_) and hyphen (-).`,
+            throw new CLIError(
+                `Invalid secret name "${newName}".`,
+                "Secret names can only contain letters (A-Z, a-z), numbers (0-9), underscores (_) and hyphens (-).",
             );
         }
 
         if (response.data.some((s) => s.name === newName && s.id !== existingSecret.id)) {
-            throw new Error(`Secret with name "${newName}" already exists.`);
+            throw new CLIError(
+                `A secret named "${newName}" already exists.`,
+                undefined,
+                `Use "ek update ${newName}" to modify it or choose a different name.`,
+            );
         }
 
         const newValue = await getSecureInput("Enter new value: ");
         if (!newValue || !newValue.trim()) {
-            throw new Error("Secret value cannot be empty.");
+            throw new CLIError(
+                "Secret value cannot be empty.",
+                undefined,
+                "Provide a non-empty value for the secret.",
+            );
         }
 
         const otherEnvironmentValues = existingSecret.values.filter((v) => v.environmentId !== environment_id);
@@ -348,34 +416,45 @@ class EnkryptifyClient {
             values: updatedValues,
         });
 
-        showMessage(`Secret updated successfully!`);
+        logger.success("Secret updated successfully!");
     }
 
     async deleteSecret(config: ProjectConfig, name: string): Promise<void> {
         const { workspace_slug, project_slug } = this.checkProjectConfig(config);
 
         if (!name || !name.trim()) {
-            throw new Error("Secret name is required. Please provide a secret name");
+            throw CLIError.from("VALIDATION_SECRET_NAME_REQUIRED");
         }
 
         const response = await this.fetchResource<ApiSecret>(
             `/v1/workspace/${workspace_slug}/project/${project_slug}/secret`,
         );
         if (response.length === 0) {
-            throw new Error("No secrets found");
+            throw new CLIError(
+                "No secrets found.",
+                "This project doesn't have any secrets in the current environment.",
+                'Use "ek create" to add a secret.',
+            );
         }
 
         const secret = response.find((s) => s.name === name);
         if (!secret) {
-            throw new Error(`Secret "${name}" not found.`);
+            throw new CLIError(
+                `Secret "${name}" not found.`,
+                "No secret with that name exists in the current environment.",
+                'Use "ek list" to see available secrets.',
+            );
         }
 
         try {
             await http.delete(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret/${secret.id}`);
-            showMessage(`Secret "${name}" deleted successfully!`);
+            logger.success(`Secret "${name}" deleted successfully!`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new Error(`Failed to delete secret: ${errorMessage}`);
+            throw new CLIError(
+                "Could not delete the secret.",
+                errorMessage,
+            );
         }
     }
 
@@ -384,14 +463,25 @@ class EnkryptifyClient {
             const response = await http.get<T[]>(url);
             if (!response.data || response.data.length === 0) {
                 const resourceName = url.split("/").filter(Boolean).pop() || "resource";
-                throw new Error(`No ${resourceName} found. Please create a ${resourceName} first.`);
+                throw new CLIError(
+                    `Could not find any ${resourceName}.`,
+                    undefined,
+                    "Create one in the Enkryptify dashboard.",
+                );
             }
 
             return response.data;
         } catch (error) {
+            if (error instanceof CLIError) throw error;
             if (error instanceof AxiosError) {
                 const status = error.response?.status;
-                if (status) throw new Error(`Failed to fetch resources from ${url}. Status: ${status ?? "unknown"}.`);
+                if (status) {
+                    throw new CLIError(
+                        "Could not load data from the Enkryptify API.",
+                        `The server returned an error (status ${status}).`,
+                        'Check your permissions and try again. Run "ek login" if the issue persists.',
+                    );
+                }
             }
             throw error;
         }
@@ -400,8 +490,11 @@ class EnkryptifyClient {
     private checkProjectConfig(config: ProjectConfig) {
         const { workspace_slug, project_slug, environment_id } = config;
         if (!workspace_slug || !project_slug || !environment_id) {
-            throw new Error(
-                "Invalid config: missing workspace_slug, project_slug, or environment_id. Please run 'ek setup' or 'ek configure' first.",
+            throw new CLIError(
+                "Your project configuration is incomplete.",
+                "The configuration file is missing required fields (workspace, project or environment).",
+                'Run "ek configure" to set up your project.',
+                "/cli/troubleshooting#configuration",
             );
         }
         return { workspace_slug, project_slug, environment_id };

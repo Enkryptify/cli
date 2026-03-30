@@ -14,7 +14,7 @@ fi
 
 DEFINES=""
 if [ -f "$ENV_FILE" ]; then
-  while IFS='=' read -r key value; do
+  while IFS='=' read -r key value || [[ -n "$key" ]]; do
     # Skip empty lines and comments
     [[ -z "$key" || "$key" == \#* ]] && continue
     # Strip surrounding quotes from value

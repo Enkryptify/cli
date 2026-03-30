@@ -1,14 +1,13 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function configure(): Promise<void> {
     const authenticated = await config.isAuthenticated();
     if (!authenticated) {
-        throw new Error(
-            'Not authenticated. Please run "ek login" first.',
-        );
+        throw CLIError.from("AUTH_NOT_LOGGED_IN");
     }
 
     const projectPath = process.cwd();
@@ -27,8 +26,11 @@ export function registerConfigureCommand(program: Command) {
             try {
                 await configure();
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

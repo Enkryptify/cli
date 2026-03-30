@@ -1,5 +1,7 @@
 import { env } from "@/env";
 import { config as configManager } from "@/lib/config";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { keyring } from "@/lib/keyring";
 import http from "@/api/httpClient";
 import { createHash, randomBytes } from "crypto";
@@ -50,7 +52,7 @@ export class Auth {
             const creds = await this.getCredentials();
             envToken = creds.accessToken;
         } catch (error: unknown) {
-            console.warn(error instanceof Error ? error.message : String(error));
+            logger.debug(error instanceof Error ? error.message : String(error));
             envToken = undefined;
         }
 
@@ -60,7 +62,7 @@ export class Auth {
             } else {
                 const isAuth = await this.getUserInfo(envToken).catch(() => false);
                 if (isAuth) {
-                    console.log("Already authenticated. Use --force to re-authenticate.");
+                    logger.info('Already logged in. Use "ek login --force" to re-authenticate with a different account.');
 
                     await configManager.markAuthenticated();
                     return;
@@ -82,7 +84,11 @@ export class Auth {
 
         const userInfo = await this.getUserInfo(authResponse.accessToken);
         if (!userInfo) {
-            throw new Error("Failed to fetch user info after authentication");
+            throw new CLIError(
+                "Could not retrieve your account information.",
+                "Authentication succeeded but the server failed to return your profile.",
+                'Try running "ek login" again.',
+            );
         }
 
         await this.markAuthenticated(authResponse.accessToken, userInfo);
@@ -120,14 +126,18 @@ export class Auth {
 
                     if (error) {
                         setTimeout(() => {
-                            fail(new Error(`authentication error: ${errorDesc}`));
+                            fail(new CLIError(`Authentication failed: ${errorDesc}`));
                         }, 1000);
                         return self.authErrorResponse(errorDesc);
                     }
 
                     if (url.searchParams.get("state") !== state) {
                         setTimeout(() => {
-                            fail(new Error("invalid state parameter"));
+                            fail(new CLIError(
+                                "Authentication failed due to a security mismatch.",
+                                "The authentication response could not be verified. This can happen if the login session expired.",
+                                'Run "ek login" to try again.',
+                            ));
                         }, 1000);
                         return self.authErrorResponse("Invalid state parameter");
                     }
@@ -135,7 +145,11 @@ export class Auth {
                     const code = url.searchParams.get("code");
                     if (!code) {
                         setTimeout(() => {
-                            fail(new Error("missing authorization code"));
+                            fail(new CLIError(
+                                "Authentication failed. No authorization was received.",
+                                "The browser did not return a valid authorization code. You may have denied access or the flow was interrupted.",
+                                'Run "ek login" to try again.',
+                            ));
                         }, 1000);
                         return self.authErrorResponse("Missing authorization code");
                     }
@@ -162,11 +176,12 @@ export class Auth {
                     routes: { "/callback": handleCallback },
                     fetch: () => new Response("Not Found", { status: 404 }),
                 });
-            } catch (err) {
+            } catch {
                 reject(
-                    new Error(
-                        `Failed to start callback server on port ${self.CALLBACK_PORT}. ` +
-                            `Please ensure the port is not in use. Error: ${err instanceof Error ? err.message : String(err)}`,
+                    new CLIError(
+                        "Could not start the login server.",
+                        `Port ${self.CALLBACK_PORT} is already in use by another application.`,
+                        "Close the application using that port and try again.",
                     ),
                 );
                 return;
@@ -175,15 +190,20 @@ export class Auth {
             const authUrl = this.buildAuthUrl(codeChallenge, state);
             this.logAuthInstructions(authUrl);
 
-            open(authUrl).catch((err) => {
-                console.warn("\n  Failed to open browser. Please open this URL manually:");
-                console.warn(authUrl);
-                console.warn(String(err));
+            open(authUrl).catch((openErr: unknown) => {
+                logger.warn("Failed to open browser automatically.", {
+                    fix: `Open this URL manually: ${authUrl}`,
+                });
+                logger.debug(String(openErr));
             });
 
             timeoutId = setTimeout(
                 () => {
-                    fail(new Error("authentication timeout"));
+                    fail(new CLIError(
+                        "Authentication timed out.",
+                        "No response was received from the browser within the time limit.",
+                        'Run "ek login" to try again. Make sure to complete the login in your browser.',
+                    ));
                 },
                 5 * 60 * 1000,
             );
@@ -204,9 +224,8 @@ export class Auth {
     }
 
     private logAuthInstructions(authUrl: string): void {
-        console.log("\n🌐 Opening browser for authentication...");
-        console.log(`\n   📋 AUTHENTICATION URL:`);
-        console.log(`   ${authUrl}\n`);
+        logger.info("Opening browser for authentication...");
+        logger.info(`Authentication URL: ${authUrl}`);
     }
 
     private escapeHtml(text: string): string {
@@ -259,13 +278,20 @@ export class Auth {
         });
 
         if (res.status < 200 || res.status >= 300) {
-            const text = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
-            throw new Error(`token exchange failed with status ${res.status}: ${text}`);
+            throw new CLIError(
+                "Could not complete the login.",
+                `The server rejected the authentication request (status ${res.status}).`,
+                'Run "ek login" to try again. If this persists, check your network connection.',
+            );
         }
 
         const data = res.data as AuthResponse;
         if (!data.accessToken) {
-            throw new Error("token exchange response missing accessToken");
+            throw new CLIError(
+                "Could not complete the login.",
+                "The server response was incomplete. No access token was provided.",
+                'Run "ek login" to try again.',
+            );
         }
 
         return data;
@@ -297,8 +323,11 @@ export class Auth {
         }
 
         if (res.status < 200 || res.status >= 300) {
-            const text = typeof res.data === "string" ? res.data : JSON.stringify(res.data);
-            throw new Error(`failed to get user info, status: ${res.status}, body: ${text}`);
+            throw new CLIError(
+                "Could not retrieve your account information.",
+                `The server returned an unexpected response (status ${res.status}).`,
+                'Run "ek login" to try again.',
+            );
         }
 
         return res.data as UserInfo;
@@ -307,18 +336,19 @@ export class Auth {
     async getCredentials(): Promise<Credentials> {
         const authDataString = await keyring.get(this.KEYRING_KEY);
         if (!authDataString) {
-            throw new Error('Not authenticated. Please run "ek login" first.');
+            throw CLIError.from("AUTH_NOT_LOGGED_IN");
         }
 
         try {
             const authData = JSON.parse(authDataString) as StoredAuthData;
             if (!authData || !authData.accessToken) {
-                throw new Error('Not authenticated. Please run "ek login" first.');
+                throw CLIError.from("AUTH_NOT_LOGGED_IN");
             }
             return { accessToken: authData.accessToken };
         } catch (error: unknown) {
-            console.warn(error instanceof Error ? error.message : String(error));
-            throw new Error('Not authenticated. Please run "ek login" first.');
+            if (error instanceof CLIError) throw error;
+            logger.debug(error instanceof Error ? error.message : String(error));
+            throw CLIError.from("AUTH_NOT_LOGGED_IN");
         }
     }
 }

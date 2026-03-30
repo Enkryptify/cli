@@ -1,11 +1,12 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function updateSecretCommand(name: string, isPersonal?: boolean): Promise<void> {
     if (!name || !name.trim()) {
-        throw new Error("Secret name is required. Please provide a secret name.");
+        throw CLIError.from("VALIDATION_SECRET_NAME_REQUIRED");
     }
 
     const projectConfig = await config.findProjectConfig(process.cwd());
@@ -23,8 +24,11 @@ export function registerUpdateCommand(program: Command) {
             try {
                 await updateSecretCommand(name, opts?.ispersonal);
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

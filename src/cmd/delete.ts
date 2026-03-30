@@ -1,11 +1,12 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function deleteSecretCommand(name: string): Promise<void> {
     if (!name || !name.trim()) {
-        throw new Error("Secret name is required. Please provide a secret name");
+        throw CLIError.from("VALIDATION_SECRET_NAME_REQUIRED");
     }
 
     const projectConfig = await config.findProjectConfig(process.cwd());
@@ -22,8 +23,11 @@ export function registerDeleteCommand(program: Command) {
             try {
                 await deleteSecretCommand(name);
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

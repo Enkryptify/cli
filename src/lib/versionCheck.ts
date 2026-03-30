@@ -1,10 +1,11 @@
 import { env } from "@/env";
 import { loadConfig, saveConfig } from "@/lib/config";
+import { logger } from "@/lib/logger";
 import axios from "axios";
 import semver from "semver";
 
 const GITHUB_RELEASES_URL = "https://api.github.com/repos/Enkryptify/cli/releases/latest";
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export async function fetchLatestVersion(): Promise<string | null> {
     try {
@@ -28,19 +29,7 @@ function printUpdateReminder(current: string, latest: string): void {
     if (!diff || (diff !== "major" && diff !== "minor")) return;
     if (!semver.gt(latest, current)) return;
 
-    const yellow = "\x1b[33m";
-    const cyan = "\x1b[36m";
-    const dim = "\x1b[2m";
-    const reset = "\x1b[0m";
-
-    const message = `${yellow}Update available: ${dim}${current}${reset}${yellow} → ${cyan}${latest}${reset}`;
-    const hint = `${dim}Run ${cyan}ek upgrade${reset}${dim} to update${reset}`;
-
-    const line = "─".repeat(50);
-    process.stderr.write(`\n${dim}╭${line}╮${reset}\n`);
-    process.stderr.write(`${dim}│${reset}  ${message}  ${dim}│${reset}\n`);
-    process.stderr.write(`${dim}│${reset}  ${hint}  ${dim}│${reset}\n`);
-    process.stderr.write(`${dim}╰${line}╯${reset}\n\n`);
+    logger.warn(`A new version is available: v${current} → v${latest}. Run "ek upgrade" to update.`);
 }
 
 export async function checkForUpdate(): Promise<void> {
@@ -48,20 +37,16 @@ export async function checkForUpdate(): Promise<void> {
         const config = await loadConfig();
         const currentVersion = env.CLI_VERSION;
 
-        // Phase 1: Show reminder from cached data (instant, no network)
         const cachedVersion = config.settings?.latestVersion;
         if (cachedVersion && semver.valid(cachedVersion) && semver.valid(currentVersion)) {
             printUpdateReminder(currentVersion, cachedVersion);
         }
 
-        // Phase 2: Background fetch to update cache for next command
         const lastCheck = config.settings?.lastUpdateCheck;
         const lastCheckTime = lastCheck ? new Date(lastCheck).getTime() : 0;
         const now = Date.now();
-
         if (now - lastCheckTime < CHECK_INTERVAL_MS) return;
 
-        // Fire-and-forget: fetch and save, no output
         fetchLatestVersion()
             .then(async (latestVersion) => {
                 if (!latestVersion) return;
@@ -73,6 +58,6 @@ export async function checkForUpdate(): Promise<void> {
             })
             .catch(() => {});
     } catch {
-        // Silently ignore all errors — must never crash or delay the CLI
+        // Ignore errors
     }
 }

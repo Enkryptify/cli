@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 export function restoreCursor(): void {
     process.stdout.write("\x1b[?25h");
 }
@@ -21,7 +23,9 @@ export function setupTerminalCleanup(): void {
 
     process.on("uncaughtException", (error) => {
         cleanup();
-        console.error("Uncaught exception:", error);
+        logger.error("Uncaught exception.", {
+            why: error instanceof Error ? error.message : String(error),
+        });
         process.exit(1);
     });
 }
