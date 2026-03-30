@@ -9,11 +9,8 @@ export function registerLogoutCommand(program: Command) {
     program
         .command("logout")
         .description("Log out of Enkryptify and revoke your CLI token.")
-        .option("--all", "Revoke all CLI tokens for your account")
-        .action(async (options: { all?: boolean }) => {
-            const tracker = analytics.trackCommand("command_logout", {
-                all: !!options.all,
-            });
+        .action(async () => {
+            const tracker = analytics.trackCommand("command_logout");
 
             try {
                 const authDataString = await keyring.get("enkryptify");
@@ -23,23 +20,18 @@ export function registerLogoutCommand(program: Command) {
                     return;
                 }
 
-                // Attempt to revoke the token server-side
                 try {
-                    await http.post("/v1/auth/cli/logout", {
-                        ...(options.all ? { all: true } : {}),
-                    });
+                    await http.post("/v1/auth/cli/logout", {});
                 } catch (revokeError: unknown) {
                     logger.warn("Could not revoke your token on the server.", {
                         why: "The server may be unreachable or the token may already be invalid.",
-                        fix: "Your local credentials have been cleared. If needed, revoke tokens from the Enkryptify dashboard.",
+                        fix: "Your local credentials have been cleared. The token will expire automatically.",
                     });
                     logger.debug(revokeError instanceof Error ? revokeError.message : String(revokeError));
                 }
 
-                // Always clear local credentials regardless of API result
                 await keyring.delete("enkryptify");
                 await configManager.clearAuthentication();
-
                 logger.info("Successfully logged out.");
                 tracker.success();
             } catch (error: unknown) {
