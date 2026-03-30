@@ -61,5 +61,14 @@
         "no-new-wrappers": "error",
         "no-throw-literal": "error",
         "radix": "error"
-    }
+    },
+    "overrides": [
+        {
+            "files": ["tests/**/*.ts"],
+            "rules": {
+                "no-template-curly-in-string": "off",
+                "typescript/no-non-null-assertion": "off"
+            }
+        }
+    ]
 }

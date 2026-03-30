@@ -6,7 +6,7 @@ import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
 
-function replaceVariables(content: string, secrets: Secret[]): string {
+export function replaceVariables(content: string, secrets: Secret[]): string {
     const secretMap = new Map<string, string>();
     for (const secret of secrets) {
         if (secret.name && secret.value != null) {

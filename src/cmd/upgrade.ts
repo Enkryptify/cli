@@ -14,7 +14,7 @@ type InstallMethod = "brew" | "scoop" | "binary";
 
 const GITHUB_DOWNLOAD_BASE = "https://github.com/Enkryptify/cli/releases/download";
 
-function detectInstallMethod(): InstallMethod {
+export function detectInstallMethod(): InstallMethod {
     const execPath = process.execPath;
 
     if (process.platform === "win32" && execPath.toLowerCase().includes("scoop")) {
@@ -28,7 +28,7 @@ function detectInstallMethod(): InstallMethod {
     return "binary";
 }
 
-function getPlatformArch(): { platform: string; arch: string; ext: string } | null {
+export function getPlatformArch(): { platform: string; arch: string; ext: string } | null {
     const platformMap: Record<string, string> = {
         linux: "Linux",
         darwin: "Darwin",
