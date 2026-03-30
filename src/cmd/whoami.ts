@@ -46,7 +46,7 @@ export function registerWhoamiCommand(program: Command) {
                     return;
                 }
 
-                logger.info(`Logged in as ${userInfo.name} (${userInfo.email})`);
+                logger.info(`Logged in as ${userInfo.email}`);
                 tracker.success();
             } catch (error: unknown) {
                 tracker.error(error instanceof Error ? error : new Error(String(error)));

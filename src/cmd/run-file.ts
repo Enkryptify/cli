@@ -66,10 +66,18 @@ export async function runFileCommand(
         logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");
     }
 
-    const successMessage = options?.env
-        ? `Secrets loaded successfully for environment "${options.env}".`
-        : "Secrets loaded successfully.";
-    logger.stderr.success(successMessage);
+    // Show connected workspace, project & environment
+    const contextParts: string[] = [];
+    contextParts.push(`Workspace: ${projectConfig.workspace_slug}`);
+    contextParts.push(`Project: ${projectConfig.project_slug}`);
+    if (options?.env) {
+        contextParts.push(`Environment: ${options.env}`);
+    } else if (projectConfig.environment_id) {
+        contextParts.push(`Environment: ${projectConfig.environment_id}`);
+    }
+    logger.stderr.info(contextParts.join(" · "));
+
+    logger.stderr.success("Secrets loaded successfully.");
 
     const file = Bun.file(filePath);
     const exists = await file.exists();

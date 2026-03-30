@@ -45,15 +45,20 @@ export async function runCommand(
         logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");
     }
 
+    // Show connected workspace, project & environment
+    const contextParts: string[] = [];
+    contextParts.push(`Workspace: ${projectconfig.workspace_slug}`);
+    contextParts.push(`Project: ${options?.project ?? projectconfig.project_slug}`);
+    if (options?.env) {
+        contextParts.push(`Environment: ${options.env}`);
+    } else if (projectconfig.environment_id) {
+        contextParts.push(`Environment: ${projectconfig.environment_id}`);
+    }
+    logger.stderr.info(contextParts.join(" · "));
+
     let successMessage = `${injectedCount} secret${injectedCount !== 1 ? "s" : ""} injected`;
     if (skippedSecrets.length > 0) {
         successMessage += `, ${skippedSecrets.length} skipped (${skippedSecrets.join(", ")})`;
-    }
-    if (options?.project) {
-        successMessage += ` for project "${options.project}"`;
-    }
-    if (options?.env) {
-        successMessage += options?.project ? ` environment "${options.env}"` : ` for environment "${options.env}"`;
     }
     successMessage += ".";
     logger.stderr.success(successMessage);
