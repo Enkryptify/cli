@@ -1,7 +1,7 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { logError } from "@/lib/error";
 import { buildEnvWithSecrets } from "@/lib/inject";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { client } from "@/api/client";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
 
@@ -10,16 +10,7 @@ export async function runCommand(
     cmd: string[],
     options?: { env?: string; project?: string; unmountSpinner?: () => void },
 ): Promise<void> {
-    const provider = providerRegistry.get(projectconfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectconfig.provider}" not found. Available providers: ${availableProviders}`);
-    }
-
-    const secrets = await provider.run(projectconfig, { env: options?.env, project: options?.project });
+    const secrets = await client.run(projectconfig, { env: options?.env, project: options?.project });
     const env = buildEnvWithSecrets(secrets);
 
     // Unmount spinner right after secrets are fetched, before command runs
@@ -27,7 +18,6 @@ export async function runCommand(
         options.unmountSpinner();
     }
 
-    // ✅ Print immediately after injection (before the user's command output starts)
     let successMessage = "Secrets injected successfully";
     if (options?.project) {
         successMessage += ` for project "${options.project}"`;
@@ -66,7 +56,7 @@ export async function runCommand(
 export function registerRunCommand(program: Command) {
     program
         .command("run")
-        .description("Run a command with secrets from the provider injected as environment variables.")
+        .description("Run a command with secrets from Enkryptify injected as environment variables.")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
         .option("-p, --project <projectName>", "Project name to use (overrides default from config)")
         .argument(

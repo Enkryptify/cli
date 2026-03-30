@@ -1,7 +1,6 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { logError } from "@/lib/error";
-import type { Secret } from "@/providers/base/Provider";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { type Secret, client } from "@/api/client";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
 
@@ -29,16 +28,7 @@ export async function runFileCommand(
     filePath: string,
     options?: { env?: string; unmountSpinner?: () => void },
 ): Promise<void> {
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
-    }
-
-    const secrets = await provider.run(projectConfig, { env: options?.env });
+    const secrets = await client.run(projectConfig, { env: options?.env });
     if (options?.unmountSpinner) {
         options.unmountSpinner();
     }
@@ -62,7 +52,7 @@ export async function runFileCommand(
 export function registerRunFileCommand(program: Command) {
     program
         .command("run-file")
-        .description("Process a file by replacing ${VARIABLE} placeholders with secrets from the provider.")
+        .description("Process a file by replacing ${VARIABLE} placeholders with secrets from Enkryptify.")
         .requiredOption("-f, --file <path>", "Path to the file to process")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
         .action(async (opts: { file: string; env?: string }) => {

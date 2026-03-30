@@ -1,6 +1,6 @@
 import { config } from "@/lib/config";
 import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { client } from "@/api/client";
 import type { Command } from "commander";
 
 export async function updateSecretCommand(name: string, isPersonal?: boolean): Promise<void> {
@@ -10,16 +10,7 @@ export async function updateSecretCommand(name: string, isPersonal?: boolean): P
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
-    }
-
-    await provider.updateSecret(projectConfig, name, isPersonal);
+    await client.updateSecret(projectConfig, name, isPersonal);
 }
 
 export function registerUpdateCommand(program: Command) {
@@ -27,7 +18,7 @@ export function registerUpdateCommand(program: Command) {
         .command("update")
         .description("Update a secret in the current environment")
         .argument("<name>", "Secret name (key) to update. Example: ek update MySecret")
-        .option("--ispersonal", "Make the secret personal (Enkryptify provider only)")
+        .option("--ispersonal", "Make the secret personal")
         .action(async (name: string, opts?: { ispersonal?: boolean }) => {
             try {
                 await updateSecretCommand(name, opts?.ispersonal);

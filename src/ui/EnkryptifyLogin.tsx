@@ -1,27 +1,26 @@
-import type { LoginOptions } from "@/providers/base/AuthProvider";
-import type { Provider } from "@/providers/base/Provider";
+import type { LoginOptions } from "@/api/auth";
+import { client } from "@/api/client";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useEffect, useState } from "react";
 
 export interface EnkryptifyLoginProps {
-    provider: Provider;
     options?: LoginOptions;
     onError?: (error: Error) => void;
     onComplete?: () => void;
 }
 
-export function EnkryptifyLogin({ provider, options, onError, onComplete }: EnkryptifyLoginProps) {
+export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLoginProps) {
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
     const [message, setMessage] = useState<string>("");
 
     useEffect(() => {
         const performLogin = async () => {
             try {
-                setMessage(`Authenticating with ${provider.name}...`);
-                await provider.login(options);
+                setMessage("Authenticating with Enkryptify...");
+                await client.login(options);
                 setStatus("success");
-                setMessage(`✓ Successfully authenticated with ${provider.name}`);
+                setMessage("✓ Successfully authenticated with Enkryptify");
 
                 setTimeout(() => {
                     onComplete?.();
@@ -35,7 +34,7 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
         };
 
         void performLogin();
-    }, [provider, options]);
+    }, [options]);
 
     return (
         <>

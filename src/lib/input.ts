@@ -36,21 +36,3 @@ export async function getTextInput(prompt: string): Promise<string> {
 
     return (response.value as string) || "";
 }
-
-export async function confirmPrompt(message: string): Promise<boolean> {
-    const response = await prompts(
-        {
-            type: "confirm",
-            name: "value",
-            message: message,
-            initial: false,
-        },
-        {
-            onCancel: () => {
-                process.exit(130);
-            },
-        },
-    );
-
-    return (response.value ?? false) === true;
-}
