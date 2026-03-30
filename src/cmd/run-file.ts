@@ -1,13 +1,19 @@
 import { type ProjectConfig, config } from "@/lib/config";
 import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
+import { isDangerousEnvVar } from "@/lib/inject";
 import { logger } from "@/lib/logger";
+import { writeStdout } from "@/lib/stdout";
 import { type Secret, client } from "@/api/client";
 import { fetchSecretsWithCache } from "@/lib/secretCache";
 import { RunFlow } from "@/ui/RunFlow";
 import type { Command } from "commander";
 
-export function replaceVariables(content: string, secrets: Secret[]): string {
+export function replaceVariables(
+    content: string,
+    secrets: Secret[],
+    options?: { allowDangerousVars?: boolean },
+): string {
     const secretMap = new Map<string, string>();
     for (const secret of secrets) {
         if (secret.name && secret.value != null) {
@@ -18,7 +24,12 @@ export function replaceVariables(content: string, secrets: Secret[]): string {
     return content.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, varName: string) => {
         const value = secretMap.get(varName);
         if (value !== undefined) {
-            return value;
+            if (!options?.allowDangerousVars && isDangerousEnvVar(varName)) {
+                logger.stderr.warn(
+                    `Secret "${varName}" matches a protected environment variable name. Use --allow-dangerous-vars to suppress this warning.`,
+                );
+            }
+            return value.replace(/\r/g, "");
         }
 
         logger.stderr.warn(`Variable "${varName}" was not found in your secrets and will be left unchanged.`);
@@ -29,7 +40,13 @@ export function replaceVariables(content: string, secrets: Secret[]): string {
 export async function runFileCommand(
     projectConfig: ProjectConfig,
     filePath: string,
-    options?: { env?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
+    options?: {
+        env?: string;
+        noCache?: boolean;
+        offline?: boolean;
+        allowDangerousVars?: boolean;
+        unmountSpinner?: () => void;
+    },
 ): Promise<void> {
     const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
         projectConfig,
@@ -61,8 +78,10 @@ export async function runFileCommand(
     }
 
     const content = await file.text();
-    const processedContent = replaceVariables(content, secrets);
-    process.stdout.write(processedContent);
+    const processedContent = replaceVariables(content, secrets, {
+        allowDangerousVars: options?.allowDangerousVars,
+    });
+    await writeStdout(processedContent);
 }
 
 export function registerRunFileCommand(program: Command) {
@@ -74,43 +93,57 @@ export function registerRunFileCommand(program: Command) {
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")
         .option("--skip-cache", "Skip cache and always fetch fresh secrets from the API")
         .option("--offline", "Use cached secrets without contacting the API")
-        .action(async (opts: { file: string; env?: string; skipCache?: boolean; offline?: boolean }) => {
-            const tracker = analytics.trackCommand("command_run_file", {
-                has_env_flag: !!opts.env,
-                skip_cache: !!opts.skipCache,
-                offline: !!opts.offline,
-            });
-
-            try {
-                if (opts.skipCache && opts.offline) {
-                    throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
-                }
-
-                const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
-
-                await RunFlow({
-                    envName: opts.env,
-                    run: async (unmountSpinner) => {
-                        await runFileCommand(projectConfig, opts.file, {
-                            env: opts.env,
-                            noCache: opts.skipCache,
-                            offline: opts.offline,
-                            unmountSpinner,
-                        });
-                    },
+        .option(
+            "--allow-dangerous-vars",
+            "Suppress warnings when substituting protected environment variable names (PATH, NODE_OPTIONS, etc.)",
+        )
+        .action(
+            async (opts: {
+                file: string;
+                env?: string;
+                skipCache?: boolean;
+                offline?: boolean;
+                allowDangerousVars?: boolean;
+            }) => {
+                const tracker = analytics.trackCommand("command_run_file", {
+                    has_env_flag: !!opts.env,
+                    skip_cache: !!opts.skipCache,
+                    offline: !!opts.offline,
                 });
 
-                tracker.success({
-                    workspace_slug: projectConfig.workspace_slug,
-                });
-            } catch (error) {
-                tracker.error(error);
-                if (error instanceof CLIError) {
-                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
-                } else {
-                    logger.error(error instanceof Error ? error.message : String(error));
+                try {
+                    if (opts.skipCache && opts.offline) {
+                        throw CLIError.from("COMMAND_CONFLICTING_FLAGS");
+                    }
+
+                    const projectConfig: ProjectConfig = await config.findProjectConfig(process.cwd());
+
+                    await RunFlow({
+                        envName: opts.env,
+                        run: async (unmountSpinner) => {
+                            await runFileCommand(projectConfig, opts.file, {
+                                env: opts.env,
+                                noCache: opts.skipCache,
+                                offline: opts.offline,
+                                allowDangerousVars: opts.allowDangerousVars,
+                                unmountSpinner,
+                            });
+                        },
+                    });
+
+                    tracker.success({
+                        workspace_slug: projectConfig.workspace_slug,
+                    });
+                    process.exit(0);
+                } catch (error) {
+                    tracker.error(error);
+                    if (error instanceof CLIError) {
+                        logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                    } else {
+                        logger.error(error instanceof Error ? error.message : String(error));
+                    }
+                    process.exit(1);
                 }
-                process.exit(1);
-            }
-        });
+            },
+        );
 }

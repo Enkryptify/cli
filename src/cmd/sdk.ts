@@ -2,23 +2,24 @@ import { config } from "@/lib/config";
 import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import http from "@/api/httpClient";
+import { createSdkToken } from "@/lib/sdkToken";
+import { writeStdout } from "@/lib/stdout";
 import type { Command } from "commander";
 
 export function registerSdkCommand(program: Command): void {
     program
         .command("sdk")
-        .description("Run a command with a read-only Enkryptify SDK token")
+        .description("Run a command with a read-only Enkryptify SDK token, or print the token to stdout.")
+        .option("-o, --output <mode>", 'Token delivery mode: "env" (default) injects as ENKRYPTIFY_TOKEN, "stdout" prints the raw token', "env")
         .allowUnknownOption()
         .allowExcessArguments()
-        .action(async (_options, cmd: Command) => {
+        .action(async (options: { output: string }, cmd: Command) => {
             const tracker = analytics.trackCommand("command_sdk");
 
-            const args = cmd.args as string[];
-            if (args.length === 0) {
-                tracker.error(new Error("No command provided"));
-                logger.error("No command provided.", {
-                    fix: "Usage: ek sdk -- <command>",
+            if (options.output !== "env" && options.output !== "stdout") {
+                tracker.error(new Error("Invalid output mode"));
+                logger.error(`Invalid output mode "${options.output}".`, {
+                    fix: 'Use --output env (default) or --output stdout.',
                 });
                 process.exit(1);
             }
@@ -31,23 +32,20 @@ export function registerSdkCommand(program: Command): void {
                 // getConfigure returns null if not found, doesn't throw
             }
 
-            if (!setup) {
+            if (!setup?.workspace_slug || !setup?.environment_id) {
                 tracker.error(new Error("No project configured"));
                 logger.error("No project configured in this directory.", {
                     fix: 'Run "ek configure" to set up your project first.',
                     docs: "/cli/troubleshooting#configuration",
                 });
                 process.exit(1);
+                return;
             }
 
             // 2. Create scoped SDK token (read-only, single environment, 8h)
             let token: string;
             try {
-                const { data } = await http.post<{ token: string }>(
-                    `/v1/workspace/${setup.workspace_slug}/tokens/cli`,
-                    { environmentId: setup.environment_id },
-                );
-                token = data.token;
+                token = await createSdkToken(setup.workspace_slug, setup.environment_id);
             } catch (error) {
                 tracker.error(error);
                 if (error instanceof CLIError) {
@@ -58,12 +56,28 @@ export function registerSdkCommand(program: Command): void {
                 process.exit(1);
             }
 
-            // 3. Spawn child process with token injected
+            // 3. Stdout mode: print token and exit
+            if (options.output === "stdout") {
+                await writeStdout(process.stdout.isTTY ? `${token}\n` : token);
+                tracker.success({ workspace_slug: setup.workspace_slug });
+                process.exit(0);
+            }
+
+            // 4. Env mode (default): require command args, spawn subprocess
+            const args = cmd.args as string[];
+            if (args.length === 0) {
+                tracker.error(new Error("No command provided"));
+                logger.error("No command provided.", {
+                    fix: "Usage: ek sdk -- <command>  or  ek sdk --output stdout",
+                });
+                process.exit(1);
+            }
+
             const [bin, ...rest] = args;
             if (!bin) {
                 tracker.error(new Error("No command provided"));
                 logger.error("No command provided.", {
-                    fix: "Usage: ek sdk -- <command>",
+                    fix: "Usage: ek sdk -- <command>  or  ek sdk --output stdout",
                 });
                 process.exit(1);
             }

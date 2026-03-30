@@ -47,7 +47,11 @@ describe("runFileCommand (integration)", () => {
             file: mockFile,
         });
 
-        stdoutWriteSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+        stdoutWriteSpy = vi.spyOn(process.stdout, "write").mockImplementation(((_chunk, encoding, callback) => {
+            const done = typeof encoding === "function" ? encoding : callback;
+            done?.();
+            return true;
+        }) as typeof process.stdout.write);
 
         vi.mocked(fetchSecretsWithCache).mockResolvedValue({
             secrets: FAKE_SECRETS,
@@ -71,7 +75,7 @@ describe("runFileCommand (integration)", () => {
 
         await runFileCommand(FAKE_PROJECT_CONFIG, "/tmp/template.txt");
 
-        expect(stdoutWriteSpy).toHaveBeenCalledWith("conn=postgres://localhost:5432/db");
+        expect(stdoutWriteSpy.mock.calls[0]?.[0]).toBe("conn=postgres://localhost:5432/db");
     });
 
     it("replaces multiple variables in one file", async () => {
@@ -128,7 +132,7 @@ describe("runFileCommand (integration)", () => {
 
         await runFileCommand(FAKE_PROJECT_CONFIG, "/tmp/empty.txt");
 
-        expect(stdoutWriteSpy).toHaveBeenCalledWith("");
+        expect(stdoutWriteSpy.mock.calls[0]?.[0]).toBe("");
     });
 
     it("handles secrets with empty string values (replaces with empty)", async () => {
@@ -144,7 +148,7 @@ describe("runFileCommand (integration)", () => {
 
         await runFileCommand(FAKE_PROJECT_CONFIG, "/tmp/template.txt");
 
-        expect(stdoutWriteSpy).toHaveBeenCalledWith("beforeafter");
+        expect(stdoutWriteSpy.mock.calls[0]?.[0]).toBe("beforeafter");
     });
 });
 

@@ -11,7 +11,15 @@ import type { Command } from "commander";
 export async function runCommand(
     projectconfig: ProjectConfig,
     cmd: string[],
-    options?: { env?: string; project?: string; noCache?: boolean; offline?: boolean; unmountSpinner?: () => void },
+    options?: {
+        env?: string;
+        project?: string;
+        noCache?: boolean;
+        offline?: boolean;
+        prefix?: string;
+        allowDangerousVars?: boolean;
+        unmountSpinner?: () => void;
+    },
 ): Promise<{ fromCache: boolean; cacheReason?: string; exitCode: number }> {
     const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
         projectconfig,
@@ -19,7 +27,10 @@ export async function runCommand(
         { noCache: options?.noCache, offline: options?.offline },
         () => client.run(projectconfig, { env: options?.env, project: options?.project }),
     );
-    const env = buildEnvWithSecrets(secrets);
+    const { env, injectedCount, skippedSecrets } = buildEnvWithSecrets(secrets, {
+        prefix: options?.prefix,
+        allowDangerousVars: options?.allowDangerousVars,
+    });
 
     // Unmount spinner right after secrets are fetched, before command runs
     if (options?.unmountSpinner) {
@@ -34,7 +45,10 @@ export async function runCommand(
         logger.stderr.info("Using cached secrets. Use --skip-cache to force a fresh fetch.");
     }
 
-    let successMessage = "Secrets injected successfully";
+    let successMessage = `${injectedCount} secret${injectedCount !== 1 ? "s" : ""} injected`;
+    if (skippedSecrets.length > 0) {
+        successMessage += `, ${skippedSecrets.length} skipped (${skippedSecrets.join(", ")})`;
+    }
     if (options?.project) {
         successMessage += ` for project "${options.project}"`;
     }
@@ -80,12 +94,27 @@ export function registerRunCommand(program: Command) {
         .option("-p, --project <projectName>", "Project name to use (overrides default from config)")
         .option("--skip-cache", "Skip cache and always fetch fresh secrets from the API")
         .option("--offline", "Use cached secrets without contacting the API")
+        .option("--prefix <prefix>", "Prefix all injected secret names (e.g., --prefix EK_)")
+        .option(
+            "--allow-dangerous-vars",
+            "Allow secrets to override protected environment variables (PATH, NODE_OPTIONS, etc.)",
+        )
         .argument(
             "<cmd...>",
             "Command and arguments to run (e.g. 'pnpm run dev' or use '--' to separate: 'ek run -- pnpm run dev')",
         )
         .action(
-            async (cmd: string[], opts: { env?: string; project?: string; skipCache?: boolean; offline?: boolean }) => {
+            async (
+                cmd: string[],
+                opts: {
+                    env?: string;
+                    project?: string;
+                    skipCache?: boolean;
+                    offline?: boolean;
+                    prefix?: string;
+                    allowDangerousVars?: boolean;
+                },
+            ) => {
                 const tracker = analytics.trackCommand("command_run", {
                     has_env_flag: !!opts.env,
                     has_project_flag: !!opts.project,
@@ -115,6 +144,8 @@ export function registerRunCommand(program: Command) {
                                 project: opts.project,
                                 noCache: opts.skipCache,
                                 offline: opts.offline,
+                                prefix: opts.prefix,
+                                allowDangerousVars: opts.allowDangerousVars,
                                 unmountSpinner,
                             });
                         },
@@ -126,6 +157,7 @@ export function registerRunCommand(program: Command) {
                         cache_reason: result?.cacheReason,
                         exit_code: result?.exitCode ?? 0,
                     });
+                    process.exit(result?.exitCode ?? 0);
                 } catch (error) {
                     tracker.error(error);
                     if (error instanceof CLIError) {
