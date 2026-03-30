@@ -51,7 +51,9 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
 
                 {status === "success" && (
                     <Box marginTop={1}>
-                        <Text bold color="green">{message}</Text>
+                        <Text bold color="green">
+                            {message}
+                        </Text>
                     </Box>
                 )}
 

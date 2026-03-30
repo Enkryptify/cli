@@ -376,11 +376,7 @@ class EnkryptifyClient {
 
         const newValue = await getSecureInput("Enter new value: ");
         if (!newValue || !newValue.trim()) {
-            throw new CLIError(
-                "Secret value cannot be empty.",
-                undefined,
-                "Provide a non-empty value for the secret.",
-            );
+            throw new CLIError("Secret value cannot be empty.", undefined, "Provide a non-empty value for the secret.");
         }
 
         const otherEnvironmentValues = existingSecret.values.filter((v) => v.environmentId !== environment_id);
@@ -451,10 +447,7 @@ class EnkryptifyClient {
             logger.success(`Secret "${name}" deleted successfully!`);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            throw new CLIError(
-                "Could not delete the secret.",
-                errorMessage,
-            );
+            throw new CLIError("Could not delete the secret.", errorMessage);
         }
     }
 

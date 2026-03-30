@@ -83,10 +83,9 @@ async function upgradeViaBinary(latestVersion: string): Promise<void> {
 
     const info = getPlatformArch();
     if (!info) {
-        logger.error(
-            `Automatic upgrade is not available for your platform (${process.platform}/${process.arch}).`,
-            { fix: "Download the latest version manually: https://github.com/Enkryptify/cli/releases" },
-        );
+        logger.error(`Automatic upgrade is not available for your platform (${process.platform}/${process.arch}).`, {
+            fix: "Download the latest version manually: https://github.com/Enkryptify/cli/releases",
+        });
         process.exit(1);
     }
 

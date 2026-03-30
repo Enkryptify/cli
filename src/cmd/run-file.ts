@@ -56,11 +56,7 @@ export async function runFileCommand(
     const file = Bun.file(filePath);
     const exists = await file.exists();
     if (!exists) {
-        throw new CLIError(
-            `File not found: ${filePath}`,
-            undefined,
-            "Check the file path and try again.",
-        );
+        throw new CLIError(`File not found: ${filePath}`, undefined, "Check the file path and try again.");
     }
 
     const content = await file.text();
@@ -71,6 +67,7 @@ export async function runFileCommand(
 export function registerRunFileCommand(program: Command) {
     program
         .command("run-file")
+        // eslint-disable-next-line no-template-curly-in-string
         .description("Process a file by replacing ${VARIABLE} placeholders with secrets from Enkryptify.")
         .requiredOption("-f, --file <path>", "Path to the file to process")
         .option("-e, --env <environmentName>", "Environment name to use (overrides default from config)")

@@ -46,13 +46,7 @@ const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
     },
 };
 
-const NETWORK_ERROR_CODES = new Set([
-    "ECONNREFUSED",
-    "ECONNRESET",
-    "ENOTFOUND",
-    "ETIMEDOUT",
-    "ERR_NETWORK",
-]);
+const NETWORK_ERROR_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ENOTFOUND", "ETIMEDOUT", "ERR_NETWORK"]);
 
 export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosInstance {
     const http = axios.create({
@@ -87,7 +81,9 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
                     requestConfig.headers[config.authHeaderName] = authValue;
                 }
             } catch (error) {
-                logger.debug(`Failed to retrieve auth token: ${error instanceof Error ? error.message : String(error)}`);
+                logger.debug(
+                    `Failed to retrieve auth token: ${error instanceof Error ? error.message : String(error)}`,
+                );
             }
 
             return requestConfig;

@@ -62,7 +62,9 @@ export class Auth {
             } else {
                 const isAuth = await this.getUserInfo(envToken).catch(() => false);
                 if (isAuth) {
-                    logger.info('Already logged in. Use "ek login --force" to re-authenticate with a different account.');
+                    logger.info(
+                        'Already logged in. Use "ek login --force" to re-authenticate with a different account.',
+                    );
 
                     await configManager.markAuthenticated();
                     return;
@@ -102,23 +104,22 @@ export class Auth {
         const { codeVerifier, codeChallenge, state } = params;
 
         return new Promise<AuthResponse>((resolve, reject) => {
-            const self = this;
             let server: ReturnType<typeof Bun.serve> | null = null;
             let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-            function cleanup() {
+            const cleanup = () => {
                 void server?.stop();
                 if (timeoutId) clearTimeout(timeoutId);
                 server = null;
                 timeoutId = null;
-            }
+            };
 
-            function fail(error: Error) {
+            const fail = (error: Error) => {
                 cleanup();
                 reject(error);
-            }
+            };
 
-            async function handleCallback(req: Request): Promise<Response> {
+            const handleCallback = async (req: Request): Promise<Response> => {
                 try {
                     const url = new URL(req.url);
                     const error = url.searchParams.get("error");
@@ -128,51 +129,55 @@ export class Auth {
                         setTimeout(() => {
                             fail(new CLIError(`Authentication failed: ${errorDesc}`));
                         }, 1000);
-                        return self.authErrorResponse(errorDesc);
+                        return this.authErrorResponse(errorDesc);
                     }
 
                     if (url.searchParams.get("state") !== state) {
                         setTimeout(() => {
-                            fail(new CLIError(
-                                "Authentication failed due to a security mismatch.",
-                                "The authentication response could not be verified. This can happen if the login session expired.",
-                                'Run "ek login" to try again.',
-                            ));
+                            fail(
+                                new CLIError(
+                                    "Authentication failed due to a security mismatch.",
+                                    "The authentication response could not be verified. This can happen if the login session expired.",
+                                    'Run "ek login" to try again.',
+                                ),
+                            );
                         }, 1000);
-                        return self.authErrorResponse("Invalid state parameter");
+                        return this.authErrorResponse("Invalid state parameter");
                     }
 
                     const code = url.searchParams.get("code");
                     if (!code) {
                         setTimeout(() => {
-                            fail(new CLIError(
-                                "Authentication failed. No authorization was received.",
-                                "The browser did not return a valid authorization code. You may have denied access or the flow was interrupted.",
-                                'Run "ek login" to try again.',
-                            ));
+                            fail(
+                                new CLIError(
+                                    "Authentication failed. No authorization was received.",
+                                    "The browser did not return a valid authorization code. You may have denied access or the flow was interrupted.",
+                                    'Run "ek login" to try again.',
+                                ),
+                            );
                         }, 1000);
-                        return self.authErrorResponse("Missing authorization code");
+                        return this.authErrorResponse("Missing authorization code");
                     }
 
-                    const authResp = await self.exchangeCodeForToken(code, codeVerifier);
+                    const authResp = await this.exchangeCodeForToken(code, codeVerifier);
 
                     setTimeout(() => {
                         cleanup();
                         resolve(authResp);
                     }, 1000);
 
-                    return self.authSuccessResponse();
+                    return this.authSuccessResponse();
                 } catch (err: unknown) {
                     setTimeout(() => {
                         fail(err instanceof Error ? err : new Error(String(err)));
                     }, 1000);
                     return new Response("Internal error", { status: 500 });
                 }
-            }
+            };
 
             try {
                 server = Bun.serve({
-                    port: self.CALLBACK_PORT,
+                    port: this.CALLBACK_PORT,
                     routes: { "/callback": handleCallback },
                     fetch: () => new Response("Not Found", { status: 404 }),
                 });
@@ -180,7 +185,7 @@ export class Auth {
                 reject(
                     new CLIError(
                         "Could not start the login server.",
-                        `Port ${self.CALLBACK_PORT} is already in use by another application.`,
+                        `Port ${this.CALLBACK_PORT} is already in use by another application.`,
                         "Close the application using that port and try again.",
                     ),
                 );
@@ -199,11 +204,13 @@ export class Auth {
 
             timeoutId = setTimeout(
                 () => {
-                    fail(new CLIError(
-                        "Authentication timed out.",
-                        "No response was received from the browser within the time limit.",
-                        'Run "ek login" to try again. Make sure to complete the login in your browser.',
-                    ));
+                    fail(
+                        new CLIError(
+                            "Authentication timed out.",
+                            "No response was received from the browser within the time limit.",
+                            'Run "ek login" to try again. Make sure to complete the login in your browser.',
+                        ),
+                    );
                 },
                 5 * 60 * 1000,
             );
@@ -313,7 +320,7 @@ export class Auth {
     async getUserInfo(token: string): Promise<UserInfo | null> {
         const res = await http.get<UserInfo | string>("/v1/me", {
             headers: {
-                "Authorization": `Bearer ${token}`,
+                Authorization: `Bearer ${token}`,
             },
             validateStatus: () => true,
         });
