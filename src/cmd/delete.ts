@@ -17,7 +17,7 @@ export function registerDeleteCommand(program: Command) {
     program
         .command("delete")
         .description("The delete command is used to delete a secret from the current environment.")
-        .argument("<name>", "Secret name (key) to delete. Example: ek delete MySecret")
+        .argument("<name>", "Secret name (key) to delete. Example: ek secret delete MySecret")
         .action(async (name: string) => {
             try {
                 await deleteSecretCommand(name);
