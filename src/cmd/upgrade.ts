@@ -1,4 +1,5 @@
 import { env } from "@/env";
+import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { fetchLatestVersion } from "@/lib/versionCheck";
@@ -144,6 +145,10 @@ export function registerUpgradeCommand(program: Command) {
         .description("Upgrade the Enkryptify CLI to the latest version.")
         .option("-f, --force", "Upgrade even if already on the latest version")
         .action(async (options: { force?: boolean }) => {
+            const tracker = analytics.trackCommand("command_upgrade", {
+                force: !!options.force,
+            });
+
             try {
                 const currentVersion = env.CLI_VERSION;
 
@@ -158,6 +163,7 @@ export function registerUpgradeCommand(program: Command) {
 
                 if (semver.eq(currentVersion, latestVersion) && !options.force) {
                     logger.success(`Already on the latest version (v${currentVersion}).`);
+                    tracker.success({ from_version: currentVersion, to_version: latestVersion, install_method: "none" });
                     return;
                 }
 
@@ -165,6 +171,7 @@ export function registerUpgradeCommand(program: Command) {
                     logger.success(
                         `Current version (v${currentVersion}) is newer than latest release (v${latestVersion}).`,
                     );
+                    tracker.success({ from_version: currentVersion, to_version: latestVersion, install_method: "none" });
                     return;
                 }
 
@@ -183,7 +190,14 @@ export function registerUpgradeCommand(program: Command) {
                         await upgradeViaBinary(latestVersion);
                         break;
                 }
+
+                tracker.success({
+                    from_version: currentVersion,
+                    to_version: latestVersion,
+                    install_method: method,
+                });
             } catch (error) {
+                tracker.error(error);
                 if (error instanceof CLIError) {
                     logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
                 } else {

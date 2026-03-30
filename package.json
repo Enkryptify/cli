@@ -1,9 +1,14 @@
 {
-    "name": "enkryptify-cli",
+    "name": "@enkryptify/cli",
     "version": "0.3.0",
-    "private": true,
     "type": "module",
     "module": "index.ts",
+    "bin": {
+        "ek": "./dist/cli.js"
+    },
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "bun build src/cli.ts --outdir dist --target node --minify",
         "package": "bun build  src/cli.ts --compile --outfile bin/ek",
@@ -15,7 +20,8 @@
         "build:dev": "./scripts/build-dev.sh",
         "test": "vitest",
         "test:run": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "prepublishOnly": "bun run build"
     },
     "dependencies": {
         "@t3-oss/env-core": "^0.13.10",
@@ -27,9 +33,10 @@
         "ink-text-input": "^6.0.0",
         "keytar": "^7.9.0",
         "open": "^11.0.0",
+        "posthog-node": "^5.28.5",
         "prompts": "^2.4.2",
         "react": "^19.2.4",
-        "react-devtools-core": "^6.1.5",
+        "react-devtools-core": "^7.0.1",
         "semver": "^7.7.4",
         "zod": "^4.3.6"
     },

@@ -6,20 +6,24 @@ type ErrorCatalogEntry = {
 };
 
 export class CLIError extends Error {
+    public readonly errorCode?: string;
+
     constructor(
         message: string,
         public readonly why?: string,
         public readonly fix?: string,
         public readonly docs?: string,
+        errorCode?: string,
     ) {
         super(message);
         this.name = "CLIError";
+        this.errorCode = errorCode;
     }
 
     static from(code: keyof typeof CLI_ERRORS): CLIError {
         const e: ErrorCatalogEntry = CLI_ERRORS[code];
         const fix = typeof e.fix === "function" ? e.fix() : e.fix;
-        return new CLIError(e.message, e.why, fix, e.docs);
+        return new CLIError(e.message, e.why, fix, e.docs, code);
     }
 }
 
