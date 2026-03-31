@@ -163,7 +163,11 @@ export function registerUpgradeCommand(program: Command) {
 
                 if (semver.eq(currentVersion, latestVersion) && !options.force) {
                     logger.success(`Already on the latest version (v${currentVersion}).`);
-                    tracker.success({ from_version: currentVersion, to_version: latestVersion, install_method: "none" });
+                    tracker.success({
+                        from_version: currentVersion,
+                        to_version: latestVersion,
+                        install_method: "none",
+                    });
                     return;
                 }
 
@@ -171,7 +175,11 @@ export function registerUpgradeCommand(program: Command) {
                     logger.success(
                         `Current version (v${currentVersion}) is newer than latest release (v${latestVersion}).`,
                     );
-                    tracker.success({ from_version: currentVersion, to_version: latestVersion, install_method: "none" });
+                    tracker.success({
+                        from_version: currentVersion,
+                        to_version: latestVersion,
+                        install_method: "none",
+                    });
                     return;
                 }
 

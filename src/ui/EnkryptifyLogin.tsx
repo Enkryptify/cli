@@ -16,17 +16,19 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
     const [message, setMessage] = useState<string>("");
 
     useEffect(() => {
+        let isMounted = true;
+
         const performLogin = async () => {
             try {
+                if (!isMounted) return;
                 setMessage(`${PREFIX} Authenticating with Enkryptify...`);
                 await client.login(options);
+                if (!isMounted) return;
                 setStatus("success");
                 setMessage(`${PREFIX} Successfully authenticated with Enkryptify`);
-
-                setTimeout(() => {
-                    onComplete?.();
-                }, 1000);
+                onComplete?.();
             } catch (error) {
+                if (!isMounted) return;
                 const err = error instanceof Error ? error : new Error(String(error));
                 setStatus("error");
                 setMessage(`${PREFIX} ${err.message}`);
@@ -35,6 +37,10 @@ export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLogi
         };
 
         void performLogin();
+
+        return () => {
+            isMounted = false;
+        };
     }, [options]);
 
     return (

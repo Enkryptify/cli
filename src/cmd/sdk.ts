@@ -10,7 +10,11 @@ export function registerSdkCommand(program: Command): void {
     program
         .command("sdk")
         .description("Run a command with a read-only Enkryptify SDK token, or print the token to stdout.")
-        .option("-o, --output <mode>", 'Token delivery mode: "env" (default) injects as ENKRYPTIFY_TOKEN, "stdout" prints the raw token', "env")
+        .option(
+            "-o, --output <mode>",
+            'Token delivery mode: "env" (default) injects as ENKRYPTIFY_TOKEN, "stdout" prints the raw token',
+            "env",
+        )
         .allowUnknownOption()
         .allowExcessArguments()
         .action(async (options: { output: string }, cmd: Command) => {
@@ -19,7 +23,7 @@ export function registerSdkCommand(program: Command): void {
             if (options.output !== "env" && options.output !== "stdout") {
                 tracker.error(new Error("Invalid output mode"));
                 logger.error(`Invalid output mode "${options.output}".`, {
-                    fix: 'Use --output env (default) or --output stdout.',
+                    fix: "Use --output env (default) or --output stdout.",
                 });
                 process.exit(1);
             }

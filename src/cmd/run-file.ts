@@ -48,6 +48,12 @@ export async function runFileCommand(
         unmountSpinner?: () => void;
     },
 ): Promise<void> {
+    const file = Bun.file(filePath);
+    const exists = await file.exists();
+    if (!exists) {
+        throw new CLIError(`File not found: ${filePath}`, undefined, "Check the file path and try again.");
+    }
+
     const { secrets, fromCache, cacheReason } = await fetchSecretsWithCache(
         projectConfig,
         { env: options?.env },
@@ -82,12 +88,6 @@ export async function runFileCommand(
     logger.stderr.info(contextParts.join(" · "));
 
     logger.stderr.success("Secrets loaded successfully.");
-
-    const file = Bun.file(filePath);
-    const exists = await file.exists();
-    if (!exists) {
-        throw new CLIError(`File not found: ${filePath}`, undefined, "Check the file path and try again.");
-    }
 
     const content = await file.text();
     const processedContent = replaceVariables(content, secrets, {

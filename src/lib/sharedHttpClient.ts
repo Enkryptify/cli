@@ -115,9 +115,7 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
             const status = error.response?.status;
             if (status && HTTP_ERROR_MAP[status]) {
                 const entry = HTTP_ERROR_MAP[status];
-                return Promise.reject(
-                    new CLIError(entry.message, entry.why, entry.fix, entry.docs, entry.errorCode),
-                );
+                return Promise.reject(new CLIError(entry.message, entry.why, entry.fix, entry.docs, entry.errorCode));
             }
 
             return Promise.reject(error);

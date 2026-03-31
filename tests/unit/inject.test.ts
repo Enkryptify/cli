@@ -184,11 +184,11 @@ describe("buildEnvWithSecrets", () => {
         expect(env.DB_URL).toBe("postgres://localhost");
     });
 
-    it("checks dangerous var against original name (not prefixed)", () => {
-        const secrets = [makeSecret("PATH", "/evil")];
-        const { skippedSecrets } = buildEnvWithSecrets(secrets, { prefix: "EK_" });
+    it("checks dangerous var against final name (with prefix)", () => {
+        const secrets = [makeSecret("TOOL_OPTIONS", "-agentlib:jdwp")];
+        const { skippedSecrets } = buildEnvWithSecrets(secrets, { prefix: "JAVA_" });
 
-        // PATH should still be blocked even with prefix
-        expect(skippedSecrets).toEqual(["PATH"]);
+        // JAVA_ + TOOL_OPTIONS = JAVA_TOOL_OPTIONS which is dangerous
+        expect(skippedSecrets).toEqual(["JAVA_TOOL_OPTIONS"]);
     });
 });

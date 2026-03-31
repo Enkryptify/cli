@@ -1,14 +1,13 @@
 {
     "name": "@enkryptify/cli",
     "version": "0.3.0",
-    "type": "module",
-    "module": "index.ts",
     "bin": {
         "ek": "./dist/cli.js"
     },
     "files": [
         "dist"
     ],
+    "type": "module",
     "scripts": {
         "build": "bun build src/cli.ts --outdir dist --target node --minify",
         "package": "bun build  src/cli.ts --compile --outfile bin/ek",
@@ -50,9 +49,7 @@
         "msw": "^2.12.14",
         "oxfmt": "^0.41.0",
         "oxlint": "^1.56.0",
+        "typescript": "^5.9.3",
         "vitest": "^4.1.0"
-    },
-    "peerDependencies": {
-        "typescript": "^5.9.3"
     }
 }

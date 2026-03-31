@@ -31,10 +31,8 @@
         "msw": "^2.12.14",
         "oxfmt": "^0.41.0",
         "oxlint": "^1.56.0",
-        "vitest": "^4.1.0",
-      },
-      "peerDependencies": {
         "typescript": "^5.9.3",
+        "vitest": "^4.1.0",
       },
     },
   },
