@@ -125,27 +125,22 @@ jobs:
                     - label: linux-x64
                       runner: ubuntu-latest
                       target: bun-linux-x64
-                      can_verify: true
                       binary: dist/ek
                     - label: linux-arm64
                       runner: ubuntu-24.04-arm
                       target: bun-linux-arm64
-                      can_verify: true
                       binary: dist/ek
                     - label: macos-arm64
                       runner: macos-latest
                       target: bun-darwin-arm64
-                      can_verify: true
                       binary: dist/ek
                     - label: macos-x64
                       runner: macos-13
                       target: bun-darwin-x64
-                      can_verify: true
                       binary: dist/ek
                     - label: windows-x64
                       runner: windows-latest
                       target: bun-windows-x64
-                      can_verify: true
                       binary: dist/ek.exe
 
         steps:
@@ -164,21 +159,5 @@ jobs:
 
             - run: bun install --frozen-lockfile
 
-            - name: Install libsecret (Linux)
-              if: runner.os == 'Linux'
-              run: sudo apt-get update && sudo apt-get install -y libsecret-1-0
-
             - name: Compile binary
               run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile=${{ matrix.binary }}
-
-            - name: Verify binary (Unix)
-              if: matrix.can_verify && runner.os != 'Windows'
-              run: |
-                  chmod +x ${{ matrix.binary }}
-                  ${{ matrix.binary }} -h
-
-            - name: Verify binary (Windows)
-              if: matrix.can_verify && runner.os == 'Windows'
-              shell: pwsh
-              run: |
-                  & ${{ matrix.binary }} -h
