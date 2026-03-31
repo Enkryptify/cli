@@ -20,6 +20,7 @@ type ErrorEntry = {
     why: string;
     fix: string;
     docs?: string;
+    errorCode?: string;
 };
 
 const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
@@ -28,21 +29,25 @@ const HTTP_ERROR_MAP: Record<number, ErrorEntry> = {
         why: "Your session has expired or your credentials are invalid.",
         fix: 'Run "ek login" to re-authenticate.',
         docs: "/cli/troubleshooting#authentication",
+        errorCode: "API_UNAUTHORIZED",
     },
     403: {
         message: "Access denied.",
         why: "Your account doesn't have permission to access this resource.",
         fix: "Check your role and permissions in the Enkryptify dashboard.",
+        errorCode: "API_FORBIDDEN",
     },
     404: {
         message: "The requested resource was not found.",
         why: "The workspace, project, environment or secret you're trying to access doesn't exist.",
         fix: 'Run "ek configure" to update your project settings.',
+        errorCode: "API_NOT_FOUND",
     },
     500: {
         message: "The Enkryptify server encountered an error.",
         why: "This is a server-side issue, not a problem with your setup.",
         fix: "Try again in a few minutes. If the problem persists, contact support.",
+        errorCode: "API_SERVER_ERROR",
     },
 };
 
@@ -102,6 +107,7 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
                         "The API server is unreachable. This could be a network issue, a firewall or the server may be down.",
                         "Check your internet connection and try again.",
                         "/cli/troubleshooting#network",
+                        "API_NETWORK_ERROR",
                     ),
                 );
             }
@@ -109,7 +115,9 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
             const status = error.response?.status;
             if (status && HTTP_ERROR_MAP[status]) {
                 const entry = HTTP_ERROR_MAP[status];
-                return Promise.reject(new CLIError(entry.message, entry.why, entry.fix, entry.docs));
+                return Promise.reject(
+                    new CLIError(entry.message, entry.why, entry.fix, entry.docs, entry.errorCode),
+                );
             }
 
             return Promise.reject(error);

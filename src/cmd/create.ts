@@ -24,6 +24,16 @@ export async function createSecretCommand(name: string, value: string): Promise<
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
+    // Check if a secret with this name already exists
+    const existingSecrets = await client.listSecrets(projectConfig);
+    if (existingSecrets.some((s) => s.name === validName)) {
+        throw new CLIError(
+            `A secret named "${validName}" already exists.`,
+            undefined,
+            `Use "ek secret update ${validName}" to modify it or choose a different name.`,
+        );
+    }
+
     await client.createSecret(projectConfig, validName, validValue);
 
     logger.success(`Secret created successfully! Name: ${validName}`);
@@ -42,10 +52,11 @@ export function registerCreateCommand(program: Command) {
             const tracker = analytics.trackCommand("command_secret_create");
 
             try {
-                let secretValue = value ?? "";
-
-                if (!secretValue.trim()) {
+                let secretValue: string;
+                if (value === undefined) {
                     secretValue = await getSecureInput("Enter secret value: ");
+                } else {
+                    secretValue = value;
                 }
 
                 await createSecretCommand(name, secretValue);

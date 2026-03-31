@@ -37,7 +37,11 @@ export async function runCommand(
         options.unmountSpinner();
     }
 
-    if (fromCache && cacheReason === "fallback") {
+    if (fromCache && cacheReason === "fallback_auth") {
+        logger.stderr.warn(
+            'Authentication failed. Using cached secrets as a fallback. Run "ek login" to re-authenticate.',
+        );
+    } else if (fromCache && cacheReason === "fallback") {
         logger.stderr.warn(
             "Could not reach the Enkryptify API. Using cached secrets as a fallback. Use --skip-cache to disable.",
         );

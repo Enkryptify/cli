@@ -16,7 +16,7 @@ type CacheOptions = {
     offline?: boolean;
 };
 
-export type CacheReason = "ttl" | "offline" | "fallback";
+export type CacheReason = "ttl" | "offline" | "fallback" | "fallback_auth";
 
 type CacheResult = {
     secrets: Secret[];
@@ -104,7 +104,16 @@ export async function fetchSecretsWithCache(
     } catch (error) {
         // API failed; fall back to any cached data regardless of age
         if (cached) {
-            return { secrets: cached.secrets, fromCache: true, cacheReason: "fallback" };
+            // Distinguish auth errors from network errors so the caller
+            // can display an accurate fallback message.
+            const isAuthError =
+                error instanceof CLIError &&
+                (error.errorCode === "API_UNAUTHORIZED" || error.errorCode === "AUTH_TOKEN_EXPIRED");
+            return {
+                secrets: cached.secrets,
+                fromCache: true,
+                cacheReason: isAuthError ? "fallback_auth" : "fallback",
+            };
         }
         // No cache available; re-throw
         throw error;
