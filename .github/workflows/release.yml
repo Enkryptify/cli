@@ -58,7 +58,7 @@ jobs:
                   tar --mtime='2020-01-01 00:00:00' --owner=0 --group=0 \
                     -czf dist/archives/enkryptify_Linux_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: linux
                   path: dist/archives/*.tar.gz
@@ -108,7 +108,7 @@ jobs:
                   touch -t 202001010000 dist/bin/ek dist/bin/ek.bash dist/bin/ek.zsh
                   tar -czf dist/archives/enkryptify_Darwin_arm64.tar.gz -C dist/bin ek ek.bash ek.zsh
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: macos
                   path: dist/archives/*.tar.gz
@@ -151,7 +151,7 @@ jobs:
                     -DestinationPath dist\archives\enkryptify_Windows_x86_64.zip `
                     -CompressionLevel Optimal
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@v7
               with:
                   name: windows
                   path: dist/archives/*.zip
