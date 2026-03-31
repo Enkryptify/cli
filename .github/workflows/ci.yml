@@ -53,7 +53,7 @@ jobs:
                   curl -sSfL "https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS_VERSION}/betterleaks_${BETTERLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin betterleaks
 
             - name: Scan for secrets
-              run: betterleaks git --source=. --report-format=sarif --report-path=betterleaks-results.sarif
+              run: betterleaks git --report-format=sarif --report-path=betterleaks-results.sarif .
 
             - name: Upload SARIF results
               if: always()
@@ -82,7 +82,7 @@ jobs:
             - run: bun install --frozen-lockfile
 
             - name: Audit dependencies
-              run: bunx audit-ci --moderate
+              run: bun pm audit --dev
 
             - name: Generate SBOM
               run: bunx @cyclonedx/cyclonedx-npm --output-file sbom.json

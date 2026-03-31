@@ -144,11 +144,11 @@ export function buildEnvWithSecrets(
 
         const envName = options?.prefix ? `${options.prefix}${secret.name}` : secret.name;
 
-        if (!options?.allowDangerousVars && isDangerousEnvVar(envName)) {
+        if (!options?.allowDangerousVars && isDangerousEnvVar(secret.name)) {
             logger.warn(
-                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${envName.toUpperCase()}).`,
+                `Secret "${secret.name}" was skipped. It conflicts with a protected environment variable (${secret.name.toUpperCase()}).`,
             );
-            skippedSecrets.push(envName);
+            skippedSecrets.push(secret.name);
             continue;
         }
 
