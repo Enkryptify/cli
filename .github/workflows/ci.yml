@@ -82,7 +82,7 @@ jobs:
             - run: bun install --frozen-lockfile
 
             - name: Audit dependencies
-              run: bun pm audit --dev
+              run: bun audit
 
             - name: Generate SBOM
               run: bunx @cyclonedx/cyclonedx-npm --output-file sbom.json
