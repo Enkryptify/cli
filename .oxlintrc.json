@@ -1,0 +1,74 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["typescript", "import"],
+    "categories": {},
+    "globals": {
+        "Bun": "readonly",
+        "$": "readonly"
+    },
+    "ignorePatterns": ["node_modules/**", "dist/**", "bin/**", "*.config.js", "*.config.ts", ".bun/**"],
+    "rules": {
+        "no-debugger": "error",
+        "no-duplicate-imports": "error",
+        "prefer-const": "error",
+        "no-var": "error",
+        "sort-imports": [
+            "error",
+            {
+                "ignoreCase": false,
+                "ignoreDeclarationSort": true,
+                "ignoreMemberSort": false,
+                "memberSyntaxSortOrder": ["none", "all", "multiple", "single"],
+                "allowSeparatedGroups": false
+            }
+        ],
+        "typescript/no-explicit-any": "error",
+        "typescript/no-unused-vars": [
+            "error",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_$|^_[a-zA-Z]",
+                "destructuredArrayIgnorePattern": "^_$|^_[a-zA-Z]",
+                "ignoreRestSiblings": true
+            }
+        ],
+        "typescript/consistent-type-imports": [
+            "error",
+            {
+                "prefer": "type-imports",
+                "fixStyle": "inline-type-imports"
+            }
+        ],
+        "typescript/prefer-as-const": "error",
+        "typescript/no-non-null-assertion": "warn",
+        "no-constant-condition": "error",
+        "no-empty": "error",
+        "no-extra-boolean-cast": "error",
+        "no-irregular-whitespace": "error",
+        "no-loss-of-precision": "error",
+        "no-self-compare": "error",
+        "no-template-curly-in-string": "warn",
+        "no-unreachable": "error",
+        "no-unsafe-negation": "error",
+        "no-unused-labels": "error",
+        "no-useless-catch": "error",
+        "no-useless-rename": "error",
+        "no-useless-constructor": "error",
+        "eqeqeq": ["error", "always", { "null": "ignore" }],
+        "guard-for-in": "error",
+        "no-caller": "error",
+        "no-eval": "error",
+        "no-new-wrappers": "error",
+        "no-throw-literal": "error",
+        "radix": "error"
+    },
+    "overrides": [
+        {
+            "files": ["tests/**/*.ts"],
+            "rules": {
+                "no-template-curly-in-string": "off",
+                "typescript/no-non-null-assertion": "off"
+            }
+        }
+    ]
+}

@@ -1,68 +1,78 @@
-import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { analytics } from "@/lib/analytics";
+import { logger } from "@/lib/logger";
+import { keyring } from "@/lib/keyring";
+import { Auth } from "@/api/auth";
+import { config as configManager } from "@/lib/config";
 import { LoginFlow } from "@/ui/LoginFlow";
 import type { Command } from "commander";
-import { z } from "zod";
-
-const providerOptionSchema = z
-    .string()
-    .trim()
-    .min(1, { message: "Provider name cannot be empty." })
-    .transform((v) => v.toLowerCase());
 
 export function registerLoginCommand(program: Command) {
     program
         .command("login")
-        .description("The login command is used to authenticate with a provider.")
-        .option("-p, --provider <providerName>", "Provider name (defaults to 'enkryptify' if available)")
+        .description("The login command is used to authenticate with Enkryptify.")
         .option("-f, --force", "Force re-authentication even if already logged in")
-        .action(async (options: { provider?: string; force?: boolean }) => {
-            const fallbackProviderName = "enkryptify";
+        .action(async (options: { force?: boolean }) => {
+            const tracker = analytics.trackCommand("command_login", {
+                force: !!options.force,
+            });
 
-            let providerName = fallbackProviderName;
-            if (typeof options.provider === "string") {
+            // Check for existing session before starting the OAuth flow / rendering spinner.
+            // This avoids briefly showing "Please complete authentication in your browser..."
+            // when the user is already logged in.
+            if (!options?.force) {
                 try {
-                    providerName = providerOptionSchema.parse(options.provider);
-                } catch (err: unknown) {
-                    if (err instanceof z.ZodError) {
-                        logError(err.issues.map((i) => i.message).join("\n"));
-                        process.exit(1);
+                    const authDataString = await keyring.get("enkryptify");
+                    if (authDataString) {
+                        const authData = JSON.parse(authDataString) as {
+                            accessToken: string;
+                            userId: string;
+                            email: string;
+                        };
+                        if (authData.accessToken) {
+                            // Verify the token is still valid
+                            const auth = new Auth();
+                            const userInfo = await auth.getUserInfo(authData.accessToken).catch(() => null);
+                            if (userInfo) {
+                                logger.info(
+                                    'Already logged in. Use "ek login --force" to re-authenticate with a different account.',
+                                );
+                                await configManager.markAuthenticated();
+                                tracker.success();
+                                return;
+                            }
+                        }
                     }
-                    throw err;
+                } catch {
+                    // If pre-check fails, fall through to the normal login flow
                 }
-            }
-
-            const providerInstance = providerRegistry.get(providerName);
-
-            if (!providerInstance) {
-                const availableProviders = providerRegistry
-                    .list()
-                    .map((p) => p.name)
-                    .join(", ");
-
-                if (!options.provider) {
-                    logError(
-                        `No provider specified and default "${fallbackProviderName}" is not available.\n` +
-                            `Available providers: ${availableProviders || "none"}`,
-                    );
-                } else {
-                    logError(
-                        `Provider "${options.provider}" not found. Available providers: ${availableProviders || "none"}`,
-                    );
-                }
-
-                process.exit(1);
             }
 
             await LoginFlow({
-                provider: providerInstance,
                 options: {
-                    providerName: providerName,
                     force: options.force,
                 },
                 onError: (error: Error) => {
-                    logError(error instanceof Error ? error.message : String(error));
+                    tracker.error(error);
+                    logger.error(error instanceof Error ? error.message : String(error));
                     process.exit(1);
+                },
+                onComplete: async () => {
+                    // Identify user in analytics after successful login
+                    try {
+                        const authDataString = await keyring.get("enkryptify");
+                        if (authDataString) {
+                            const authData = JSON.parse(authDataString) as {
+                                userId: string;
+                                email: string;
+                            };
+                            if (authData.userId && authData.email) {
+                                analytics.identify(authData.userId, authData.email);
+                            }
+                        }
+                    } catch {
+                        // Best-effort
+                    }
+                    tracker.success();
                 },
             });
         });

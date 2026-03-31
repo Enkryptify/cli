@@ -1,8 +1,9 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
+import { analytics } from "@/lib/analytics";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { getSecureInput } from "@/lib/input";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
-import { showMessage } from "@/ui/SuccessMessage";
+import { client } from "@/api/client";
 import { type CreateSecretInput, createSecretSchema } from "@/validators/secret";
 import type { Command } from "commander";
 import { z } from "zod";
@@ -23,18 +24,19 @@ export async function createSecretCommand(name: string, value: string): Promise<
 
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        const availableProviders = providerRegistry
-            .list()
-            .map((p) => p.name)
-            .join(", ");
-        throw new Error(`Provider "${projectConfig.provider}" not found. Available providers: ${availableProviders}`);
+    // Check if a secret with this name already exists
+    const existingSecrets = await client.listSecrets(projectConfig);
+    if (existingSecrets.some((s) => s.name === validName)) {
+        throw new CLIError(
+            `A secret named "${validName}" already exists.`,
+            undefined,
+            `Use "ek secret update ${validName}" to modify it or choose a different name.`,
+        );
     }
 
-    await provider.createSecret(projectConfig, validName, validValue);
+    await client.createSecret(projectConfig, validName, validValue);
 
-    showMessage(`Secret created successfully! Name: ${validName}`);
+    logger.success(`Secret created successfully! Name: ${validName}`);
 }
 
 export function registerCreateCommand(program: Command) {
@@ -44,19 +46,35 @@ export function registerCreateCommand(program: Command) {
         .argument("<name>", "Secret name (key) - can only contain A-Z, a-z, 0-9, underscore (_), hyphen (-)")
         .argument(
             "[value]",
-            'Secret value. Use quotes for values with spaces or special characters. Example: ek create <name> "my value!@#$%^&*()"',
+            'Secret value. Use quotes for values with spaces or special characters. Example: ek secret create <name> "my value!@#$%^&*()"',
         )
         .action(async (name: string, value?: string) => {
-            try {
-                let secretValue = value ?? "";
+            const tracker = analytics.trackCommand("command_secret_create");
 
-                if (!secretValue.trim()) {
+            try {
+                let secretValue: string;
+                if (value === undefined) {
                     secretValue = await getSecureInput("Enter secret value: ");
+                } else {
+                    secretValue = value;
                 }
 
                 await createSecretCommand(name, secretValue);
+
+                // Best-effort workspace_slug for analytics
+                try {
+                    const projectConfig = await config.findProjectConfig(process.cwd());
+                    tracker.success({ workspace_slug: projectConfig.workspace_slug });
+                } catch {
+                    tracker.success();
+                }
             } catch (error: unknown) {
-                logError(error instanceof Error ? error.message : String(error));
+                tracker.error(error);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });

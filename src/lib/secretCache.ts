@@ -1,0 +1,144 @@
+import type { Secret } from "@/api/client";
+import type { ProjectConfig } from "@/lib/config";
+import { CLIError } from "@/lib/errors";
+import { keyring } from "@/lib/keyring";
+
+const CACHE_TTL_MS = 10_000; // 10 seconds
+const CACHE_KEY_PREFIX = "secret-cache:";
+
+type CacheEntry = {
+    secrets: Secret[];
+    timestamp: number;
+};
+
+type CacheOptions = {
+    noCache?: boolean;
+    offline?: boolean;
+};
+
+export type CacheReason = "ttl" | "offline" | "fallback" | "fallback_auth";
+
+type CacheResult = {
+    secrets: Secret[];
+    fromCache: boolean;
+    cacheReason?: CacheReason;
+};
+
+function buildCacheKey(workspaceSlug: string, projectSlug: string, environmentKey: string): string {
+    return `${CACHE_KEY_PREFIX}${workspaceSlug}/${projectSlug}/${environmentKey}`;
+}
+
+function encode(entry: CacheEntry): string {
+    const json = JSON.stringify(entry);
+    return btoa(json);
+}
+
+function decode(encoded: string): CacheEntry | null {
+    try {
+        const json = atob(encoded);
+        return JSON.parse(json) as CacheEntry;
+    } catch {
+        return null;
+    }
+}
+
+async function readCache(key: string): Promise<CacheEntry | null> {
+    try {
+        const raw = await keyring.get(key);
+        if (!raw) return null;
+        return decode(raw);
+    } catch {
+        return null;
+    }
+}
+
+async function writeCache(key: string, secrets: Secret[]): Promise<void> {
+    try {
+        const entry: CacheEntry = { secrets, timestamp: Date.now() };
+        await keyring.set(key, encode(entry));
+    } catch {
+        // Keyring unavailable; silently degrade
+    }
+}
+
+export async function fetchSecretsWithCache(
+    config: ProjectConfig,
+    runOptions: { env?: string; project?: string },
+    cacheOptions: CacheOptions,
+    fetcher: () => Promise<Secret[]>,
+): Promise<CacheResult> {
+    const workspaceSlug = config.workspace_slug ?? "";
+    const projectSlug = runOptions.project ?? config.project_slug ?? "";
+    const environmentKey = runOptions.env ?? config.environment_id ?? "";
+
+    if (!workspaceSlug) {
+        throw new CLIError(
+            "Missing workspace slug for secret caching.",
+            "No workspace is configured.",
+            'Run "ek init" to set up your workspace configuration.',
+        );
+    }
+    if (!projectSlug) {
+        throw new CLIError(
+            "Missing project slug for secret caching.",
+            "No project is configured.",
+            'Run "ek init" to set up your project configuration.',
+        );
+    }
+    if (!environmentKey) {
+        throw new CLIError(
+            "Missing environment for secret caching.",
+            "No environment is configured or specified.",
+            'Use the --env flag or run "ek init" to set a default environment.',
+        );
+    }
+
+    const cacheKey = buildCacheKey(workspaceSlug, projectSlug, environmentKey);
+
+    // --skip-cache: skip cache entirely, always fetch fresh
+    if (cacheOptions.noCache) {
+        const secrets = await fetcher();
+        return { secrets, fromCache: false };
+    }
+
+    // --offline: use cache only, never fetch
+    if (cacheOptions.offline) {
+        const cached = await readCache(cacheKey);
+        if (!cached) {
+            throw new CLIError(
+                "No cached secrets available.",
+                "You're in offline mode but no secrets have been cached yet.",
+                'Run "ek run" at least once while online to populate the cache.',
+            );
+        }
+        return { secrets: cached.secrets, fromCache: true, cacheReason: "offline" };
+    }
+
+    // Normal mode: check TTL, fetch if stale, fallback to cache on error
+    const cached = await readCache(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return { secrets: cached.secrets, fromCache: true, cacheReason: "ttl" };
+    }
+
+    try {
+        const secrets = await fetcher();
+        await writeCache(cacheKey, secrets);
+        return { secrets, fromCache: false };
+    } catch (error) {
+        // API failed; fall back to any cached data regardless of age
+        if (cached) {
+            // Distinguish auth errors from network errors so the caller
+            // can display an accurate fallback message.
+            const isAuthError =
+                error instanceof CLIError &&
+                (error.errorCode === "API_UNAUTHORIZED" || error.errorCode === "AUTH_TOKEN_EXPIRED");
+            return {
+                secrets: cached.secrets,
+                fromCache: true,
+                cacheReason: isAuthError ? "fallback_auth" : "fallback",
+            };
+        }
+        // No cache available; re-throw
+        throw error;
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "singleQuote": false,
+    "semi": true,
+    "trailingComma": "all",
+    "printWidth": 120,
+    "tabWidth": 4,
+    "useTabs": false,
+    "arrowParens": "always",
+    "bracketSpacing": true,
+    "endOfLine": "lf",
+    "overrides": [
+        {
+            "files": ["bun.lock", "package.json"],
+            "options": {
+                "printWidth": 1
+            }
+        }
+    ]
+}

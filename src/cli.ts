@@ -1,8 +1,11 @@
 import { registerCommands } from "@/cmd/index";
 import { env } from "@/env";
-import { logError } from "@/lib/error";
+import { analytics } from "@/lib/analytics";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 import { setupTerminalCleanup } from "@/lib/terminal";
-import "@/providers/registry/index.js";
+import { checkForUpdate } from "@/lib/versionCheck";
+
 import { Command } from "commander";
 import { getCompletions } from "./complete/complete";
 
@@ -14,9 +17,9 @@ program.configureOutput({
     writeErr: (str) => {
         const errorMatch = str.match(/error:\s*(.+)/i);
         if (errorMatch && errorMatch[1]) {
-            logError(errorMatch[1].trim());
+            logger.error(errorMatch[1].trim());
         } else {
-            logError(str.trim());
+            logger.error(str.trim());
         }
     },
 });
@@ -28,13 +31,31 @@ registerCommands(program);
 if (isCompletion) {
     const words = process.argv.slice(3);
     const completions = getCompletions(program, ["ek", ...words]);
-    console.log(completions.join("\n"));
+    // Shell completions must go to stdout raw — not through the logger
+    process.stdout.write(completions.join("\n") + "\n");
     process.exit(0);
 }
 
 setupTerminalCleanup();
+await analytics.init();
 
-program.parseAsync(process.argv).catch((error) => {
-    logError(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-});
+const isUpgrade = process.argv[2] === "upgrade";
+if (!isCompletion && !isUpgrade) {
+    checkForUpdate().catch(() => {});
+}
+
+program
+    .parseAsync(process.argv)
+    .catch((error) => {
+        if (error instanceof CLIError) {
+            analytics.track("cli_error", { error_code: error.errorCode, error_message: error.message });
+            logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+        } else {
+            analytics.track("cli_error", { error_message: error instanceof Error ? error.message : String(error) });
+            logger.error(error instanceof Error ? error.message : String(error));
+        }
+        process.exitCode = 1;
+    })
+    .finally(async () => {
+        await analytics.shutdown();
+    });

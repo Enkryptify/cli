@@ -1,41 +1,47 @@
-import type { LoginOptions } from "@/providers/base/AuthProvider";
-import type { Provider } from "@/providers/base/Provider";
+import type { LoginOptions } from "@/api/auth";
+import { client } from "@/api/client";
+import { PREFIX } from "@/lib/logger";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useEffect, useState } from "react";
 
 export interface EnkryptifyLoginProps {
-    provider: Provider;
     options?: LoginOptions;
     onError?: (error: Error) => void;
     onComplete?: () => void;
 }
 
-export function EnkryptifyLogin({ provider, options, onError, onComplete }: EnkryptifyLoginProps) {
+export function EnkryptifyLogin({ options, onError, onComplete }: EnkryptifyLoginProps) {
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
     const [message, setMessage] = useState<string>("");
 
     useEffect(() => {
+        let isMounted = true;
+
         const performLogin = async () => {
             try {
-                setMessage(`Authenticating with ${provider.name}...`);
-                await provider.login(options);
+                if (!isMounted) return;
+                setMessage(`${PREFIX} Authenticating with Enkryptify...`);
+                await client.login(options);
+                if (!isMounted) return;
                 setStatus("success");
-                setMessage(`✓ Successfully authenticated with ${provider.name}`);
-
-                setTimeout(() => {
-                    onComplete?.();
-                }, 1000);
+                setMessage(`${PREFIX} Successfully authenticated with Enkryptify`);
+                onComplete?.();
             } catch (error) {
+                if (!isMounted) return;
                 const err = error instanceof Error ? error : new Error(String(error));
                 setStatus("error");
-                setMessage(`⚠️  ${err.message}`);
+                setMessage(`${PREFIX} ${err.message}`);
                 onError?.(err);
             }
         };
 
         void performLogin();
-    }, [provider, options]);
+
+        return () => {
+            isMounted = false;
+        };
+    }, [options]);
 
     return (
         <>
@@ -51,7 +57,9 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
 
                 {status === "success" && (
                     <Box marginTop={1}>
-                        <Text bold>{message}</Text>
+                        <Text bold color="green">
+                            {message}
+                        </Text>
                     </Box>
                 )}
 
@@ -66,7 +74,7 @@ export function EnkryptifyLogin({ provider, options, onError, onComplete }: Enkr
 
             {status === "loading" && (
                 <Box marginTop={1}>
-                    <Text>Please complete authentication in your browser...</Text>
+                    <Text>{PREFIX} Please complete authentication in your browser...</Text>
                 </Box>
             )}
         </>

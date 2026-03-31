@@ -1,24 +1,18 @@
 import { config } from "@/lib/config";
-import { logError } from "@/lib/error";
-import { providerRegistry } from "@/providers/registry/ProviderRegistry";
+import { analytics } from "@/lib/analytics";
+import { CLIError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
+import { client } from "@/api/client";
 import { showSecretsTable } from "@/ui/SecretsTable";
 import { type Command } from "commander";
 
-export async function ListSecretsCommand(mode: "show" | "hide"): Promise<void> {
+export async function listSecretsCommand(mode: "show" | "hide"): Promise<{ count: number; workspaceSlug?: string }> {
     const projectConfig = await config.findProjectConfig(process.cwd());
 
-    const provider = providerRegistry.get(projectConfig.provider);
-    if (!provider) {
-        throw new Error(
-            `Provider "${projectConfig.provider}" not found. Available providers: ${providerRegistry
-                .list()
-                .map((p) => p.name)
-                .join(", ")}`,
-        );
-    }
-
-    const secrets = await provider.listSecrets(projectConfig, mode);
+    const secrets = await client.listSecrets(projectConfig, mode);
     showSecretsTable(secrets);
+
+    return { count: secrets.length, workspaceSlug: projectConfig.workspace_slug };
 }
 
 export function registerListCommand(program: Command) {
@@ -27,13 +21,25 @@ export function registerListCommand(program: Command) {
         .description("The list command is used to show the secrets in the current environment.")
         .option("-s, --show", "Show the table with the secrets values (default: masked)")
         .action(async (opts: { show?: boolean }) => {
+            const tracker = analytics.trackCommand("command_secret_list", {
+                show_values: !!opts.show,
+            });
+
             try {
                 const mode: "show" | "hide" = opts.show ? "show" : "hide";
 
-                await ListSecretsCommand(mode);
+                const result = await listSecretsCommand(mode);
+                tracker.success({
+                    workspace_slug: result.workspaceSlug,
+                    secret_count: result.count,
+                });
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                logError(errorMessage);
+                tracker.error(error);
+                if (error instanceof CLIError) {
+                    logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+                } else {
+                    logger.error(error instanceof Error ? error.message : String(error));
+                }
                 process.exit(1);
             }
         });
