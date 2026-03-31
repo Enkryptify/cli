@@ -1,7 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
 import { keyring } from "@/lib/keyring";
-import { client } from "@/api/client";
+import { Auth } from "@/api/auth";
 import { config as configManager } from "@/lib/config";
 import { LoginFlow } from "@/ui/LoginFlow";
 import type { Command } from "commander";
@@ -30,7 +30,7 @@ export function registerLoginCommand(program: Command) {
                         };
                         if (authData.accessToken) {
                             // Verify the token is still valid
-                            const auth = new (await import("@/api/auth")).Auth();
+                            const auth = new Auth();
                             const userInfo = await auth.getUserInfo(authData.accessToken).catch(() => null);
                             if (userInfo) {
                                 logger.info(
