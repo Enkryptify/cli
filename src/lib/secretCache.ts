@@ -70,6 +70,29 @@ export async function fetchSecretsWithCache(
     const workspaceSlug = config.workspace_slug ?? "";
     const projectSlug = runOptions.project ?? config.project_slug ?? "";
     const environmentKey = runOptions.env ?? config.environment_id ?? "";
+
+    if (!workspaceSlug) {
+        throw new CLIError(
+            "Missing workspace slug for secret caching.",
+            "No workspace is configured.",
+            'Run "ek init" to set up your workspace configuration.',
+        );
+    }
+    if (!projectSlug) {
+        throw new CLIError(
+            "Missing project slug for secret caching.",
+            "No project is configured.",
+            'Run "ek init" to set up your project configuration.',
+        );
+    }
+    if (!environmentKey) {
+        throw new CLIError(
+            "Missing environment for secret caching.",
+            "No environment is configured or specified.",
+            'Use the --env flag or run "ek init" to set a default environment.',
+        );
+    }
+
     const cacheKey = buildCacheKey(workspaceSlug, projectSlug, environmentKey);
 
     // --skip-cache: skip cache entirely, always fetch fresh

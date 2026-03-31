@@ -12,7 +12,7 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
   echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
 fi
 
-DEFINES=""
+ARGS=()
 if [ -f "$ENV_FILE" ]; then
   while IFS='=' read -r key value || [[ -n "$key" ]]; do
     # Skip empty lines and comments
@@ -20,11 +20,11 @@ if [ -f "$ENV_FILE" ]; then
     # Strip surrounding quotes from value
     value="${value%\"}" ; value="${value#\"}"
     value="${value%\'}" ; value="${value#\'}"
-    DEFINES="$DEFINES --define process.env.${key}='\"${value}\"'"
+    ARGS+=(--define "process.env.${key}=\"${value}\"")
   done < "$ENV_FILE"
 else
   echo "⚠ No .env file found at $ENV_FILE (building with defaults)"
 fi
 
-eval bun build "$PROJECT_DIR/src/cli.ts" --compile --outfile "$DEST" $DEFINES
+bun build "$PROJECT_DIR/src/cli.ts" --compile --outfile "$DEST" "${ARGS[@]}"
 echo "✓ Installed ek-dev → $DEST"
