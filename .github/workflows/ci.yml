@@ -134,10 +134,6 @@ jobs:
                       runner: macos-latest
                       target: bun-darwin-arm64
                       binary: dist/ek
-                    - label: macos-x64
-                      runner: macos-13
-                      target: bun-darwin-x64
-                      binary: dist/ek
                     - label: windows-x64
                       runner: windows-latest
                       target: bun-windows-x64
