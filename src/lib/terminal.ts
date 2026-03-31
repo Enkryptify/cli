@@ -1,7 +1,9 @@
 import { logger } from "@/lib/logger";
 
 export function restoreCursor(): void {
-    process.stdout.write("\x1b[?25h");
+    if (process.stdout.isTTY) {
+        process.stdout.write("\x1b[?25h");
+    }
 }
 
 export function setupTerminalCleanup(): void {
