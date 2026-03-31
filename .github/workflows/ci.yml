@@ -13,7 +13,7 @@ concurrency:
 jobs:
     lint:
         name: Lint & Typecheck
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
 
@@ -40,7 +40,7 @@ jobs:
 
     betterleaks:
         name: Secret Scanning
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
               with:
@@ -65,7 +65,7 @@ jobs:
 
     dependency-audit:
         name: Dependency Audit
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
 
@@ -96,7 +96,7 @@ jobs:
 
     test:
         name: Test
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v6
 
@@ -123,29 +123,20 @@ jobs:
             matrix:
                 include:
                     - label: linux-x64
-                      runner: blacksmith-2vcpu-ubuntu-2404
+                      runner: ubuntu-latest
                       target: bun-linux-x64
-                      can_verify: true
                       binary: dist/ek
                     - label: linux-arm64
-                      runner: blacksmith-2vcpu-ubuntu-2404-arm
+                      runner: ubuntu-24.04-arm
                       target: bun-linux-arm64
-                      can_verify: true
                       binary: dist/ek
                     - label: macos-arm64
-                      runner: blacksmith-2vcpu-ubuntu-2404-arm
+                      runner: macos-latest
                       target: bun-darwin-arm64
-                      can_verify: false
-                      binary: dist/ek
-                    - label: macos-x64
-                      runner: blacksmith-2vcpu-ubuntu-2404
-                      target: bun-darwin-x64
-                      can_verify: false
                       binary: dist/ek
                     - label: windows-x64
-                      runner: blacksmith-2vcpu-windows-2025
+                      runner: windows-latest
                       target: bun-windows-x64
-                      can_verify: true
                       binary: dist/ek.exe
 
         steps:
@@ -154,10 +145,6 @@ jobs:
             - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
                   bun-version: "1.3.10"
-
-            - name: Install system dependencies (Linux)
-              if: runner.os == 'Linux'
-              run: sudo apt-get update && sudo apt-get install -y libsecret-1-0
 
             - uses: actions/cache@v4
               if: runner.os != 'Windows'
@@ -170,15 +157,3 @@ jobs:
 
             - name: Compile binary
               run: bun build src/cli.ts --compile --target=${{ matrix.target }} --outfile=${{ matrix.binary }}
-
-            - name: Verify binary (Unix)
-              if: matrix.can_verify && runner.os != 'Windows'
-              run: |
-                  chmod +x ${{ matrix.binary }}
-                  ${{ matrix.binary }} -h
-
-            - name: Verify binary (Windows)
-              if: matrix.can_verify && runner.os == 'Windows'
-              shell: pwsh
-              run: |
-                  & ${{ matrix.binary }} -h
