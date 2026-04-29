@@ -28,7 +28,9 @@ jobs:
               run: bun audit --audit-level=high
 
             - name: Generate SBOM
-              run: bunx @cyclonedx/cyclonedx-npm --output-file sbom.json
+              run: |
+                  tmpdir=$(mktemp -d)
+                  npm exec --prefix "$tmpdir" --yes --package @cyclonedx/cyclonedx-npm -- cyclonedx-npm --output-file sbom.json
 
             - name: Upload SBOM
               uses: actions/upload-artifact@v4
