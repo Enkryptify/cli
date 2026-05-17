@@ -25,8 +25,6 @@ export async function fetchLatestVersion(): Promise<string | null> {
 }
 
 function printUpdateReminder(current: string, latest: string): void {
-    const diff = semver.diff(current, latest);
-    if (!diff || (diff !== "major" && diff !== "minor")) return;
     if (!semver.gt(latest, current)) return;
 
     logger.warn(`A new version is available: v${current} → v${latest}. Run "ek upgrade" to update.`);
