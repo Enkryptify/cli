@@ -27,4 +27,11 @@ else
 fi
 
 bun build "$PROJECT_DIR/src/cli.ts" --compile --outfile "$DEST" "${ARGS[@]}"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  codesign --remove-signature "$DEST" >/dev/null 2>&1 || true
+  codesign --force --sign - "$DEST" >/dev/null 2>&1 || \
+    echo "⚠ codesign failed — ek-dev may be killed by AMFI on macOS 26+"
+fi
+
 echo "✓ Installed ek-dev → $DEST"
