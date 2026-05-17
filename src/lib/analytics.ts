@@ -3,7 +3,6 @@ import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
 import { CLIError } from "@/lib/errors";
 import { loadConfig, saveConfig } from "@/lib/config";
-import { PostHog } from "posthog-node";
 import { randomUUID } from "crypto";
 
 type StoredAuthData = {
@@ -27,12 +26,19 @@ export type CommandTracker = {
     error(error: unknown): void;
 };
 
-let posthog: PostHog | null = null;
+type QueuedEvent = {
+    distinctId: string;
+    event: string;
+    properties: Record<string, unknown>;
+    timestamp: string;
+};
+
 let enabled = false;
 let distinctId: string | null = null;
 let anonymousId: string | null = null;
 let superProperties: Record<string, unknown> = {};
 let noticeShown = false;
+const pendingEvents: QueuedEvent[] = [];
 
 function isOptedOut(): boolean {
     const telemetryEnv = process.env.EK_TELEMETRY;
@@ -84,6 +90,19 @@ async function showFirstRunNotice(): Promise<void> {
     }
 }
 
+function getSelfSpawnCommand(): string[] {
+    const exec = process.execPath;
+    const arg1 = process.argv[1];
+
+    // Compiled Bun binary: argv[1] is a virtual /$bunfs/ path inside the binary,
+    // not a real file we can re-exec — just run the binary again.
+    if (!arg1 || arg1.startsWith("/$bunfs/")) {
+        return [exec];
+    }
+
+    return [exec, arg1];
+}
+
 export const analytics = {
     async init(): Promise<void> {
         if (isTestEnvironment() || isOptedOut()) {
@@ -92,14 +111,12 @@ export const analytics = {
         }
 
         try {
-            // Check config-level opt-out
             const config = await loadConfig();
             if (config.settings?.telemetry === "false") {
                 enabled = false;
                 return;
             }
 
-            // Get or create anonymous ID
             anonymousId = config.settings?.anonymousId ?? null;
             if (!anonymousId) {
                 anonymousId = randomUUID();
@@ -108,10 +125,8 @@ export const analytics = {
                 await saveConfig(config);
             }
 
-            // Default distinct ID is the anonymous ID
             distinctId = anonymousId;
 
-            // Try to read user identity from keyring
             try {
                 const authDataString = await keyring.get("enkryptify");
                 if (authDataString) {
@@ -124,7 +139,6 @@ export const analytics = {
                 // Best-effort, continue with anonymous ID
             }
 
-            // Build super properties
             superProperties = {
                 cli_version: env.CLI_VERSION,
                 os: process.platform,
@@ -132,35 +146,6 @@ export const analytics = {
                 node_version: process.version,
                 is_ci: detectCI(),
             };
-
-            // Initialize PostHog client
-            posthog = new PostHog(env.POSTHOG_API_KEY, {
-                host: env.POSTHOG_HOST,
-                flushAt: 10,
-                flushInterval: 5000,
-                requestTimeout: 3000,
-                disabled: false,
-            });
-
-            // Identify user if we have a real user ID (not anonymous)
-            if (distinctId !== anonymousId) {
-                try {
-                    const authDataString = await keyring.get("enkryptify");
-                    if (authDataString) {
-                        const parsed: unknown = JSON.parse(authDataString);
-                        if (isValidStoredAuthData(parsed)) {
-                            posthog.identify({
-                                distinctId: parsed.userId,
-                                properties: {
-                                    email: parsed.email,
-                                },
-                            });
-                        }
-                    }
-                } catch {
-                    // Best-effort
-                }
-            }
 
             enabled = true;
         } catch {
@@ -170,44 +155,46 @@ export const analytics = {
     },
 
     identify(userId: string, email: string): void {
-        if (!enabled || !posthog) return;
+        if (!enabled) return;
 
         try {
-            // If we were using an anonymous ID, alias it to the real user
+            const identifyProps: Record<string, unknown> = {
+                ...superProperties,
+                $set: { email },
+            };
+
+            // Link the prior anonymous ID to the user when transitioning from anonymous
             if (anonymousId && distinctId === anonymousId) {
-                posthog.alias({
-                    distinctId: userId,
-                    alias: anonymousId,
-                });
+                identifyProps.$anon_distinct_id = anonymousId;
             }
 
-            distinctId = userId;
-
-            posthog.identify({
+            pendingEvents.push({
                 distinctId: userId,
-                properties: {
-                    email,
-                },
+                event: "$identify",
+                properties: identifyProps,
+                timestamp: new Date().toISOString(),
             });
+
+            distinctId = userId;
         } catch {
             // Best-effort
         }
     },
 
     track(event: string, properties?: Record<string, unknown>): void {
-        if (!enabled || !posthog || !distinctId) return;
+        if (!enabled || !distinctId) return;
 
         try {
-            // Show first-run notice (fire-and-forget)
             void showFirstRunNotice();
 
-            posthog.capture({
+            pendingEvents.push({
                 distinctId,
                 event,
                 properties: {
                     ...superProperties,
                     ...properties,
                 },
+                timestamp: new Date().toISOString(),
             });
         } catch {
             // Never throw from analytics
@@ -242,13 +229,23 @@ export const analytics = {
         };
     },
 
-    async shutdown(): Promise<void> {
-        if (!enabled || !posthog) return;
+    shutdown(): void {
+        if (!enabled || pendingEvents.length === 0) return;
 
         try {
-            await Promise.race([posthog.shutdown(), new Promise((resolve) => setTimeout(resolve, 2000))]);
+            const payload = JSON.stringify({ events: pendingEvents });
+            const cmd = getSelfSpawnCommand();
+            const proc = Bun.spawn([...cmd, "__analytics", payload], {
+                stdin: "ignore",
+                stdout: "ignore",
+                stderr: "ignore",
+                // Detach so the worker survives the parent exiting
+                detached: true,
+            });
+            proc.unref();
+            pendingEvents.length = 0;
         } catch {
-            // Never throw from analytics shutdown
+            // Never throw from analytics shutdown; leave pendingEvents intact
         }
     },
 

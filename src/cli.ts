@@ -9,6 +9,12 @@ import { checkForUpdate } from "@/lib/versionCheck";
 import { Command } from "commander";
 import { getCompletions } from "./complete/complete";
 
+if (process.argv[2] === "__analytics") {
+    const { runAnalyticsWorker } = await import("@/lib/analytics-worker");
+    await runAnalyticsWorker();
+    process.exit(0);
+}
+
 const isCompletion = process.argv[2] === "__complete";
 
 const program = new Command();
@@ -44,18 +50,17 @@ if (!isCompletion && !isUpgrade) {
     checkForUpdate().catch(() => {});
 }
 
-program
-    .parseAsync(process.argv)
-    .catch((error) => {
-        if (error instanceof CLIError) {
-            analytics.track("cli_error", { error_code: error.errorCode, error_message: error.message });
-            logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
-        } else {
-            analytics.track("cli_error", { error_message: error instanceof Error ? error.message : String(error) });
-            logger.error(error instanceof Error ? error.message : String(error));
-        }
-        process.exitCode = 1;
-    })
-    .finally(async () => {
-        await analytics.shutdown();
-    });
+process.on("exit", () => {
+    analytics.shutdown();
+});
+
+program.parseAsync(process.argv).catch((error) => {
+    if (error instanceof CLIError) {
+        analytics.track("cli_error", { error_code: error.errorCode, error_message: error.message });
+        logger.error(error.message, { why: error.why, fix: error.fix, docs: error.docs });
+    } else {
+        analytics.track("cli_error", { error_message: error instanceof Error ? error.message : String(error) });
+        logger.error(error instanceof Error ? error.message : String(error));
+    }
+    process.exitCode = 1;
+});

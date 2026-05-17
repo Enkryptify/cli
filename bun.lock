@@ -37,7 +37,7 @@
     },
   },
   "overrides": {
-    "axios": ">=1.15.0",
+    "axios": "^1.15.2",
     "follow-redirects": ">=1.15.11",
     "picomatch": ">=4.0.4",
     "vite": ">=8.0.4",
