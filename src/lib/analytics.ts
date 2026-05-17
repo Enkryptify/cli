@@ -234,11 +234,8 @@ export const analytics = {
 
         try {
             const payload = JSON.stringify({ events: pendingEvents });
-            pendingEvents.length = 0;
-
             const cmd = getSelfSpawnCommand();
-            const proc = Bun.spawn([...cmd, "__analytics"], {
-                env: { ...process.env, EK_ANALYTICS_PAYLOAD: payload },
+            const proc = Bun.spawn([...cmd, "__analytics", payload], {
                 stdin: "ignore",
                 stdout: "ignore",
                 stderr: "ignore",
@@ -246,8 +243,9 @@ export const analytics = {
                 detached: true,
             });
             proc.unref();
+            pendingEvents.length = 0;
         } catch {
-            // Never throw from analytics shutdown
+            // Never throw from analytics shutdown; leave pendingEvents intact
         }
     },
 

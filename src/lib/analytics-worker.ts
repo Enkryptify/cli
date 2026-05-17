@@ -34,7 +34,7 @@ async function postEvent(event: WorkerEvent): Promise<void> {
 
 export async function runAnalyticsWorker(): Promise<void> {
     try {
-        const raw = process.env.EK_ANALYTICS_PAYLOAD;
+        const raw = process.argv[3];
         if (!raw) return;
 
         const payload = JSON.parse(raw) as WorkerPayload;
