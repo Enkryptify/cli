@@ -184,8 +184,9 @@ export async function runBetterleaks(binPath: string, targetDir: string): Promis
 
         const SCAN_TIMEOUT = 300000;
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let exitCode: number;
         try {
-            await Promise.race([
+            exitCode = await Promise.race([
                 proc.exited,
                 new Promise<never>((_, reject) => {
                     timeoutId = setTimeout(() => reject(new Error("timeout")), SCAN_TIMEOUT);
@@ -201,7 +202,8 @@ export async function runBetterleaks(binPath: string, targetDir: string): Promis
             clearTimeout(timeoutId);
         }
 
-        if (!fs.existsSync(reportPath)) {
+        // We pass --exit-code 0, so a non-zero exit means betterleaks itself errored.
+        if (exitCode !== 0 || !fs.existsSync(reportPath)) {
             throw CLIError.from("SCAN_RUN_FAILED");
         }
 
