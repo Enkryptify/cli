@@ -133,6 +133,19 @@ export const analytics = {
             };
 
             enabled = true;
+
+            // One usage event per invocation. $set writes these as person properties
+            // (last-write-wins), so each person is counted under their current version:
+            // after an upgrade they move to the new version instead of being
+            // double-counted on the old one.
+            analytics.track("version_usage", {
+                $set: {
+                    cli_version: env.CLI_VERSION,
+                    os: process.platform,
+                    arch: process.arch,
+                    node_version: process.version,
+                },
+            });
         } catch {
             // Analytics initialization should never break the CLI
             enabled = false;
