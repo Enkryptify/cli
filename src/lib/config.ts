@@ -1,12 +1,19 @@
 import { CLIError } from "@/lib/errors";
+import { getGitRepoInfo } from "@/lib/git";
 import { logger } from "@/lib/logger";
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 
+export type ConfigureScope = "path" | "git";
+
 export type ProjectConfig = {
     path: string;
     [key: string]: string;
+};
+
+type ConfigureOptions = {
+    scope?: ConfigureScope;
 };
 
 type ConfigFile = {
@@ -190,23 +197,45 @@ async function isAuthenticated(): Promise<boolean> {
     return config.providers?.["enkryptify"] != null;
 }
 
-async function createConfigure(projectPath: string, projectConfig: ProjectConfig): Promise<void> {
+async function getSetupKey(projectPath: string, scope: ConfigureScope): Promise<string> {
+    if (scope === "path") {
+        return path.resolve(projectPath);
+    }
+
+    const gitRepo = await getGitRepoInfo(projectPath);
+    if (!gitRepo) {
+        throw new CLIError(
+            "No Git repository found.",
+            "The current directory is not inside a Git repository.",
+            'Run "ek configure" without --git to set up this path, or run it from inside a Git repository.',
+            "/cli/troubleshooting#configuration",
+        );
+    }
+
+    return gitRepo.setupKey;
+}
+
+async function createConfigureWithOptions(
+    projectPath: string,
+    projectConfig: ProjectConfig,
+    options: ConfigureOptions = {},
+): Promise<void> {
     const config = await loadConfig();
-    const normalizedPath = path.resolve(projectPath);
+    const setupKey = await getSetupKey(projectPath, options.scope ?? "path");
 
     if (!config.setups) config.setups = {};
 
     const { path: _, ...setupData } = projectConfig;
-    config.setups[normalizedPath] = setupData;
+    config.setups[setupKey] = setupData;
 
     await saveConfig(config);
 }
 
-async function getConfigure(projectPath: string): Promise<ProjectConfig | null> {
+async function getConfigure(projectPath: string, options: ConfigureOptions = {}): Promise<ProjectConfig | null> {
     const config = await loadConfig();
-    const normalizedPath = path.resolve(projectPath);
-    const setup = config.setups?.[normalizedPath];
-    return setup ? { path: normalizedPath, ...setup } : null;
+    const setupKey = await getSetupKey(projectPath, options.scope ?? "path");
+    const setup = config.setups?.[setupKey];
+    return setup ? { path: setupKey, ...setup } : null;
 }
 
 async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
@@ -223,6 +252,14 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
         currentPath = path.dirname(currentPath);
     }
 
+    const gitRepo = await getGitRepoInfo(startPath);
+    if (gitRepo) {
+        const setup = config.setups?.[gitRepo.setupKey];
+        if (setup) {
+            return { path: gitRepo.setupKey, ...setup };
+        }
+    }
+
     throw new CLIError(
         "No project configured for this directory.",
         "No Enkryptify configuration was found in this directory or any parent directory.",
@@ -235,7 +272,7 @@ export const config = {
     markAuthenticated,
     clearAuthentication,
     isAuthenticated,
-    createConfigure,
+    createConfigure: createConfigureWithOptions,
     getConfigure,
     findProjectConfig,
 };

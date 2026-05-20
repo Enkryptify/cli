@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { execFileSync } from "child_process";
 import type * as ConfigModule from "@/lib/config";
 
 vi.mock("@/lib/logger");
@@ -174,6 +175,88 @@ describe("config (integration)", () => {
         const found = await config.findProjectConfig(childPath);
         expect(found.workspace_slug).toBe("ws");
         expect(found.path).toBe(path.resolve(parentPath));
+    });
+
+    it("finds git-scoped config from another worktree", async () => {
+        const repoPath = path.join(tmpDir, "repo");
+        const worktreePath = path.join(tmpDir, "repo-worktree");
+        fs.mkdirSync(repoPath, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+        fs.writeFileSync(path.join(repoPath, "README.md"), "test\n", "utf-8");
+        execFileSync("git", ["add", "README.md"], { cwd: repoPath });
+        execFileSync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "init"], {
+            cwd: repoPath,
+        });
+        execFileSync("git", ["worktree", "add", "-b", "test-worktree", worktreePath], { cwd: repoPath });
+
+        await config.createConfigure(
+            repoPath,
+            {
+                path: repoPath,
+                workspace_slug: "ws-git",
+                project_slug: "proj-git",
+                environment_id: "env-git",
+            },
+            { scope: "git" },
+        );
+
+        const found = await config.findProjectConfig(worktreePath);
+        expect(found.workspace_slug).toBe("ws-git");
+        expect(found.project_slug).toBe("proj-git");
+        expect(found.path).toMatch(/^git:/);
+    });
+
+    it("uses the same git-scoped config key from repo subdirectories", async () => {
+        const repoPath = path.join(tmpDir, "repo-subdir");
+        const subdirPath = path.join(repoPath, "packages", "app");
+        fs.mkdirSync(subdirPath, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+
+        await config.createConfigure(
+            repoPath,
+            {
+                path: repoPath,
+                workspace_slug: "ws-git",
+                project_slug: "proj-git",
+                environment_id: "env-git",
+            },
+            { scope: "git" },
+        );
+
+        const found = await config.findProjectConfig(subdirPath);
+        expect(found.workspace_slug).toBe("ws-git");
+        expect(found.project_slug).toBe("proj-git");
+        expect(found.path).toMatch(/^git:/);
+    });
+
+    it("prefers path-scoped config over git-scoped config", async () => {
+        const repoPath = path.join(tmpDir, "repo-with-override");
+        const childPath = path.join(repoPath, "packages", "app");
+        fs.mkdirSync(childPath, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+
+        await config.createConfigure(
+            repoPath,
+            {
+                path: repoPath,
+                workspace_slug: "ws-git",
+                project_slug: "proj-git",
+                environment_id: "env-git",
+            },
+            { scope: "git" },
+        );
+
+        await config.createConfigure(childPath, {
+            path: childPath,
+            workspace_slug: "ws-path",
+            project_slug: "proj-path",
+            environment_id: "env-path",
+        });
+
+        const found = await config.findProjectConfig(childPath);
+        expect(found.workspace_slug).toBe("ws-path");
+        expect(found.project_slug).toBe("proj-path");
+        expect(found.path).toBe(path.resolve(childPath));
     });
 
     it("throws CLIError when no config found", async () => {

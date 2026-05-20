@@ -1,4 +1,4 @@
-import { type ProjectConfig, config } from "@/lib/config";
+import { type ConfigureScope, type ProjectConfig, config } from "@/lib/config";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { getSecureInput, getTextInput } from "@/lib/input";
@@ -98,8 +98,8 @@ class EnkryptifyClient {
         await this.auth.login(options);
     }
 
-    async configure(options: string): Promise<ProjectConfig> {
-        const setup = await config.getConfigure(options);
+    async configure(options: string, configureOptions?: { scope?: ConfigureScope }): Promise<ProjectConfig> {
+        const setup = await config.getConfigure(options, configureOptions);
         if (setup) {
             const overwrite = await confirm("Setup already exists. Overwrite?");
             if (!overwrite) {

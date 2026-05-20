@@ -1,21 +1,49 @@
-import { config } from "@/lib/config";
+import { type ConfigureScope, config } from "@/lib/config";
 import { analytics } from "@/lib/analytics";
 import { CLIError } from "@/lib/errors";
+import { getGitRepoInfo } from "@/lib/git";
 import { logger } from "@/lib/logger";
 import { client } from "@/api/client";
+import { selectName } from "@/ui/SelectItem";
 import type { Command } from "commander";
 
-export async function configure(): Promise<Record<string, string>> {
+type ConfigureCommandOptions = {
+    git?: boolean;
+};
+
+const GIT_SCOPE_LABEL = "Git repository (recommended)";
+const PATH_SCOPE_LABEL = "This path only";
+
+async function resolveConfigureScope(projectPath: string, options: ConfigureCommandOptions): Promise<ConfigureScope> {
+    if (options.git) {
+        return "git";
+    }
+
+    const gitRepo = await getGitRepoInfo(projectPath);
+    if (!gitRepo) {
+        return "path";
+    }
+
+    const selectedScope = await selectName(
+        [GIT_SCOPE_LABEL, PATH_SCOPE_LABEL],
+        "Connect this setup to this path or to the Git repository?",
+    );
+
+    return selectedScope === PATH_SCOPE_LABEL ? "path" : "git";
+}
+
+export async function configure(options: ConfigureCommandOptions = {}): Promise<Record<string, string>> {
     const authenticated = await config.isAuthenticated();
     if (!authenticated) {
         throw CLIError.from("AUTH_NOT_LOGGED_IN");
     }
 
     const projectPath = process.cwd();
+    const scope = await resolveConfigureScope(projectPath, options);
 
-    const projectConfig = await client.configure(projectPath);
+    const projectConfig = await client.configure(projectPath, { scope });
 
-    await config.createConfigure(projectPath, projectConfig);
+    await config.createConfigure(projectPath, projectConfig, { scope });
 
     return projectConfig;
 }
@@ -25,11 +53,12 @@ export function registerConfigureCommand(program: Command) {
         .command("configure")
         .alias("setup")
         .description("The configure command is used to set up a project with Enkryptify.")
-        .action(async () => {
+        .option("--git", "Connect this setup to the current Git repository instead of only this path")
+        .action(async (options: ConfigureCommandOptions) => {
             const tracker = analytics.trackCommand("command_configure");
 
             try {
-                const projectConfig = await configure();
+                const projectConfig = await configure(options);
                 tracker.success({
                     workspace_slug: projectConfig.workspace_slug,
                 });
