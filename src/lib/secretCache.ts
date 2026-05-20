@@ -1,7 +1,7 @@
 import type { Secret } from "@/api/client";
 import type { ProjectConfig } from "@/lib/config";
 import { CLIError } from "@/lib/errors";
-import { keyring } from "@/lib/keyring";
+import { secureStore } from "@/lib/secureStore";
 
 const CACHE_TTL_MS = 10_000; // 10 seconds
 const CACHE_KEY_PREFIX = "secret-cache:";
@@ -28,11 +28,6 @@ function buildCacheKey(workspaceSlug: string, projectSlug: string, environmentKe
     return `${CACHE_KEY_PREFIX}${workspaceSlug}/${projectSlug}/${environmentKey}`;
 }
 
-function encode(entry: CacheEntry): string {
-    const json = JSON.stringify(entry);
-    return btoa(json);
-}
-
 function decode(encoded: string): CacheEntry | null {
     try {
         const json = atob(encoded);
@@ -44,9 +39,7 @@ function decode(encoded: string): CacheEntry | null {
 
 async function readCache(key: string): Promise<CacheEntry | null> {
     try {
-        const raw = await keyring.get(key);
-        if (!raw) return null;
-        return decode(raw);
+        return await secureStore.getSecretCacheEntry(key);
     } catch {
         return null;
     }
@@ -55,10 +48,14 @@ async function readCache(key: string): Promise<CacheEntry | null> {
 async function writeCache(key: string, secrets: Secret[]): Promise<void> {
     try {
         const entry: CacheEntry = { secrets, timestamp: Date.now() };
-        await keyring.set(key, encode(entry));
+        await secureStore.setSecretCacheEntry(key, entry);
     } catch {
         // Keyring unavailable; silently degrade
     }
+}
+
+async function readLegacyCache(key: string): Promise<CacheEntry | null> {
+    return await secureStore.migrateLegacySecretCacheEntry(key, decode);
 }
 
 export async function fetchSecretsWithCache(
@@ -103,7 +100,7 @@ export async function fetchSecretsWithCache(
 
     // --offline: use cache only, never fetch
     if (cacheOptions.offline) {
-        const cached = await readCache(cacheKey);
+        const cached = (await readCache(cacheKey)) ?? (await readLegacyCache(cacheKey));
         if (!cached) {
             throw new CLIError(
                 "No cached secrets available.",
@@ -115,7 +112,7 @@ export async function fetchSecretsWithCache(
     }
 
     // Normal mode: check TTL, fetch if stale, fallback to cache on error
-    const cached = await readCache(cacheKey);
+    const cached = (await readCache(cacheKey)) ?? (await readLegacyCache(cacheKey));
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         return { secrets: cached.secrets, fromCache: true, cacheReason: "ttl" };
     }

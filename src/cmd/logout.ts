@@ -1,8 +1,8 @@
 import http from "@/api/httpClient";
 import { analytics } from "@/lib/analytics";
 import { config as configManager } from "@/lib/config";
-import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
+import { secureStore } from "@/lib/secureStore";
 import type { Command } from "commander";
 
 export function registerLogoutCommand(program: Command) {
@@ -13,8 +13,8 @@ export function registerLogoutCommand(program: Command) {
             const tracker = analytics.trackCommand("command_logout");
 
             try {
-                const authDataString = await keyring.get("enkryptify");
-                if (!authDataString) {
+                const authData = await secureStore.getAuth();
+                if (!authData?.accessToken) {
                     logger.info("You are not logged in.");
                     tracker.success();
                     return;
@@ -30,7 +30,7 @@ export function registerLogoutCommand(program: Command) {
                     logger.debug(revokeError instanceof Error ? revokeError.message : String(revokeError));
                 }
 
-                await keyring.delete("enkryptify");
+                await secureStore.clearAll();
                 await configManager.clearAuthentication();
                 logger.info("Successfully logged out.");
                 tracker.success();

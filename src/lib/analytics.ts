@@ -1,25 +1,9 @@
 import { env } from "@/env";
-import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
 import { CLIError } from "@/lib/errors";
 import { loadConfig, saveConfig } from "@/lib/config";
+import { type StoredAuthData, secureStore } from "@/lib/secureStore";
 import { randomUUID } from "crypto";
-
-type StoredAuthData = {
-    accessToken: string;
-    userId: string;
-    email: string;
-};
-
-function isValidStoredAuthData(value: unknown): value is StoredAuthData {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        typeof (value as Record<string, unknown>).accessToken === "string" &&
-        typeof (value as Record<string, unknown>).userId === "string" &&
-        typeof (value as Record<string, unknown>).email === "string"
-    );
-}
 
 export type CommandTracker = {
     success(properties?: Record<string, unknown>): void;
@@ -128,12 +112,9 @@ export const analytics = {
             distinctId = anonymousId;
 
             try {
-                const authDataString = await keyring.get("enkryptify");
-                if (authDataString) {
-                    const parsed: unknown = JSON.parse(authDataString);
-                    if (isValidStoredAuthData(parsed)) {
-                        distinctId = parsed.userId;
-                    }
+                const authData: StoredAuthData | null = await secureStore.getAuth();
+                if (authData) {
+                    distinctId = authData.userId;
                 }
             } catch {
                 // Best-effort, continue with anonymous ID
