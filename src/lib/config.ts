@@ -238,6 +238,11 @@ async function getConfigure(projectPath: string, options: ConfigureOptions = {})
     return setup ? { path: setupKey, ...setup } : null;
 }
 
+async function hasAnyProject(): Promise<boolean> {
+    const cfg = await loadConfig();
+    return Object.keys(cfg.setups ?? {}).length > 0;
+}
+
 async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
     const config = await loadConfig();
     let currentPath = path.resolve(startPath);
@@ -275,4 +280,5 @@ export const config = {
     createConfigure: createConfigureWithOptions,
     getConfigure,
     findProjectConfig,
+    hasAnyProject,
 };

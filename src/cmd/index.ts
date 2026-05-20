@@ -6,6 +6,7 @@ import { registerLoginCommand } from "@/cmd/login";
 import { registerLogoutCommand } from "@/cmd/logout";
 import { registerRunCommand } from "@/cmd/run";
 import { registerRunFileCommand } from "@/cmd/run-file";
+import { registerScanCommand } from "@/cmd/scan";
 import { registerSdkCommand } from "@/cmd/sdk";
 import { registerUpdateCommand } from "@/cmd/update";
 import { registerUpgradeCommand } from "@/cmd/upgrade";
@@ -17,6 +18,7 @@ export function registerCommands(program: Command) {
     registerLogoutCommand(program);
     registerWhoamiCommand(program);
     registerConfigureCommand(program);
+    registerScanCommand(program);
     registerRunCommand(program);
     registerRunFileCommand(program);
     registerSdkCommand(program);

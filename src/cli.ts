@@ -43,7 +43,8 @@ if (isCompletion) {
 }
 
 setupTerminalCleanup();
-await analytics.init();
+// "scan" needs no authentication, so skip the keychain lookup to avoid a password prompt.
+await analytics.init({ skipAuthLookup: process.argv[2] === "scan" });
 
 const isUpgrade = process.argv[2] === "upgrade";
 if (!isCompletion && !isUpgrade) {
