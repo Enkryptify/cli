@@ -240,4 +240,21 @@ export const CLI_ERRORS = {
         why: "The GitHub API is unreachable.",
         fix: "Check your internet connection and try again.",
     },
+
+    // Scan
+    SCAN_UNSUPPORTED_PLATFORM: {
+        message: "Secret scanning is not available for your platform.",
+        why: "No betterleaks binary is published for this OS/architecture.",
+        fix: "Install betterleaks manually from https://github.com/betterleaks/betterleaks/releases and make sure it is on your PATH.",
+    },
+    SCAN_INSTALL_FAILED: {
+        message: "Could not install betterleaks.",
+        why: "The download or extraction of the betterleaks binary failed.",
+        fix: "Check your internet connection and try again, or install it manually from https://github.com/betterleaks/betterleaks/releases",
+    },
+    SCAN_RUN_FAILED: {
+        message: "The secret scan failed to run.",
+        why: "betterleaks exited unexpectedly or produced no report.",
+        fix: "Try again. If the problem persists, run betterleaks directly to see the underlying error.",
+    },
 } as const;

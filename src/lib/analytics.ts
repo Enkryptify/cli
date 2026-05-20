@@ -88,7 +88,9 @@ function getSelfSpawnCommand(): string[] {
 }
 
 export const analytics = {
-    async init(): Promise<void> {
+    // `skipAuthLookup` avoids reading the keychain for commands that don't need auth
+    // (e.g. "ek scan"), so they never trigger a keychain password prompt.
+    async init(options?: { skipAuthLookup?: boolean }): Promise<void> {
         if (isTestEnvironment() || isOptedOut()) {
             enabled = false;
             return;
@@ -111,13 +113,15 @@ export const analytics = {
 
             distinctId = anonymousId;
 
-            try {
-                const authData: StoredAuthData | null = await secureStore.getAuth();
-                if (authData) {
-                    distinctId = authData.userId;
+            if (!options?.skipAuthLookup) {
+                try {
+                    const authData: StoredAuthData | null = await secureStore.getAuth();
+                    if (authData) {
+                        distinctId = authData.userId;
+                    }
+                } catch {
+                    // Best-effort, continue with anonymous ID
                 }
-            } catch {
-                // Best-effort, continue with anonymous ID
             }
 
             superProperties = {
