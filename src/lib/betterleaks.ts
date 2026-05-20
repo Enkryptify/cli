@@ -2,6 +2,7 @@ import { CLIError } from "@/lib/errors";
 import { getGitRepoInfo } from "@/lib/git";
 import axios from "axios";
 import { execFile, execFileSync } from "child_process";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as os from "os";
@@ -12,6 +13,18 @@ const execFileAsync = promisify(execFile);
 
 const BETTERLEAKS_VERSION = "1.3.0";
 const BETTERLEAKS_DOWNLOAD_BASE = "https://github.com/betterleaks/betterleaks/releases/download";
+
+// SHA-256 of each pinned release asset, copied from betterleaks' official v1.3.0
+// checksums.txt. Pinned in source rather than fetched at runtime so a tampered or
+// MITM'd download can't also supply a matching checksum. Update with the version.
+const BETTERLEAKS_CHECKSUMS: Record<string, string> = {
+    "betterleaks_1.3.0_darwin_arm64.tar.gz": "e2110fc396d96f8795a668f294efd8a84ec96d694d1daf9ce1a4fa788d354f4c",
+    "betterleaks_1.3.0_darwin_x64.tar.gz": "270e8b46b9b5478199b3facc5ee01bd67659de9c8e57b7b1d6c1336f44ee7822",
+    "betterleaks_1.3.0_linux_arm64.tar.gz": "53e94d704871e11d47e25304cb0813ce6aa0cf96b58d7b92ed7bc5a1d568efde",
+    "betterleaks_1.3.0_linux_x64.tar.gz": "51568ae18383996aa24d87807879774e1feb75bd5a5a652d19ce0fd14e4c06ba",
+    "betterleaks_1.3.0_windows_arm64.zip": "079571796442c527106143024f03a6b21af9e542a59bc1f33b1d9cd042f7a141",
+    "betterleaks_1.3.0_windows_x64.zip": "6c3c2950befd972e080ebc2f1a7278187efc75f60ea75a737b95e3c8703efdd7",
+};
 
 const INSTALL_DIR = path.join(os.homedir(), ".enkryptify", "bin");
 const BINARY_NAME = process.platform === "win32" ? "betterleaks.exe" : "betterleaks";
@@ -74,7 +87,15 @@ export async function installBetterleaks(): Promise<string> {
         const archivePath = path.join(tmpDir, assetName);
 
         const response = await axios.get(downloadUrl, { responseType: "arraybuffer", timeout: 60000 });
-        fs.writeFileSync(archivePath, Buffer.from(response.data as ArrayBuffer));
+        const archiveBuffer = Buffer.from(response.data as ArrayBuffer);
+
+        const expectedChecksum = BETTERLEAKS_CHECKSUMS[assetName];
+        const actualChecksum = crypto.createHash("sha256").update(archiveBuffer).digest("hex");
+        if (!expectedChecksum || actualChecksum !== expectedChecksum) {
+            throw CLIError.from("SCAN_INSTALL_FAILED");
+        }
+
+        fs.writeFileSync(archivePath, archiveBuffer);
 
         if (assetName.endsWith(".zip")) {
             execFileSync("tar", ["-xf", archivePath, "-C", tmpDir], { stdio: "pipe" });
@@ -160,7 +181,25 @@ export async function runBetterleaks(binPath: string, targetDir: string): Promis
             ],
             { cwd: targetDir, stdin: "ignore", stdout: "ignore", stderr: "ignore" },
         );
-        await proc.exited;
+
+        const SCAN_TIMEOUT = 300000;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        try {
+            await Promise.race([
+                proc.exited,
+                new Promise<never>((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error("timeout")), SCAN_TIMEOUT);
+                }),
+            ]);
+        } catch (error) {
+            if (error instanceof Error && error.message === "timeout") {
+                proc.kill();
+                throw CLIError.from("SCAN_RUN_FAILED");
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         if (!fs.existsSync(reportPath)) {
             throw CLIError.from("SCAN_RUN_FAILED");

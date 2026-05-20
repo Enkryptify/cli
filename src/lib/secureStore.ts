@@ -4,6 +4,32 @@ import { keyring } from "@/lib/keyring";
 export const SECURE_STORE_KEY = "enkryptify";
 export const SECURE_STORE_VERSION = 1;
 
+class AsyncMutex {
+    private locked = false;
+    private waiters: Array<() => void> = [];
+
+    async acquire(): Promise<void> {
+        if (!this.locked) {
+            this.locked = true;
+            return;
+        }
+        return new Promise((resolve) => {
+            this.waiters.push(resolve);
+        });
+    }
+
+    release(): void {
+        const waiter = this.waiters.shift();
+        if (waiter) {
+            waiter();
+        } else {
+            this.locked = false;
+        }
+    }
+}
+
+const storeMutex = new AsyncMutex();
+
 export type StoredAuthData = {
     accessToken: string;
     userId: string;
@@ -73,9 +99,14 @@ async function writeStore(store: SecureStoreData): Promise<void> {
 }
 
 async function updateStore(updater: (store: SecureStoreData) => void): Promise<void> {
-    const store = await readStore();
-    updater(store);
-    await writeStore(store);
+    await storeMutex.acquire();
+    try {
+        const store = await readStore();
+        updater(store);
+        await writeStore(store);
+    } finally {
+        storeMutex.release();
+    }
 }
 
 export const secureStore = {
