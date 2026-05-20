@@ -1,7 +1,7 @@
 import { CLIError } from "@/lib/errors";
 import { getGitRepoInfo } from "@/lib/git";
 import axios from "axios";
-import { execFile, execSync } from "child_process";
+import { execFile, execFileSync } from "child_process";
 import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as os from "os";
@@ -77,9 +77,9 @@ export async function installBetterleaks(): Promise<string> {
         fs.writeFileSync(archivePath, Buffer.from(response.data as ArrayBuffer));
 
         if (assetName.endsWith(".zip")) {
-            execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: "pipe" });
+            execFileSync("tar", ["-xf", archivePath, "-C", tmpDir], { stdio: "pipe" });
         } else {
-            execSync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { stdio: "pipe" });
+            execFileSync("tar", ["-xzf", archivePath, "-C", tmpDir], { stdio: "pipe" });
         }
 
         const extractedBinary = path.join(tmpDir, BINARY_NAME);
