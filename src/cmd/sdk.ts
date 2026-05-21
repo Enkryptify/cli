@@ -28,12 +28,12 @@ export function registerSdkCommand(program: Command): void {
                 process.exit(1);
             }
 
-            // 1. Load project config (walks up from cwd)
+            // 1. Load project config (walks up from cwd and checks git-scoped setup)
             let setup;
             try {
-                setup = await config.getConfigure(process.cwd());
+                setup = await config.findProjectConfig(process.cwd());
             } catch {
-                // getConfigure returns null if not found, doesn't throw
+                // findProjectConfig throws when no setup exists
             }
 
             if (!setup?.workspace_slug || !setup?.environment_id) {

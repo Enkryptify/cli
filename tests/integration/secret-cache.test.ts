@@ -42,6 +42,10 @@ describe("fetchSecretsWithCache (integration)", () => {
         return vi.fn().mockRejectedValue(error);
     }
 
+    function legacyEncode(value: unknown): string {
+        return Buffer.from(JSON.stringify(value), "utf8").toString("base64");
+    }
+
     // --- noCache mode ---
 
     it("noCache=true always calls fetcher", async () => {
@@ -130,6 +134,18 @@ describe("fetchSecretsWithCache (integration)", () => {
     it("writes fresh data to cache", async () => {
         const fetcher = makeFetcher();
         await fetchSecretsWithCache(FAKE_PROJECT_CONFIG, defaultRunOptions, {}, fetcher);
+
+        const stored = await mockKeyring.get("enkryptify");
+        const cacheKey = `secret-cache:${FAKE_PROJECT_CONFIG.workspace_slug}/${FAKE_PROJECT_CONFIG.project_slug}/${FAKE_PROJECT_CONFIG.environment_id}`;
+        expect(JSON.parse(stored!)).toEqual({
+            version: 1,
+            secretCache: {
+                [cacheKey]: {
+                    secrets: FAKE_SECRETS,
+                    timestamp: NOW,
+                },
+            },
+        });
 
         // Verify cache was written by reading it back within TTL
         const fetcher2 = makeFetcher();
@@ -253,5 +269,36 @@ describe("fetchSecretsWithCache (integration)", () => {
         expect(fetcher).toHaveBeenCalledOnce();
         expect(result.fromCache).toBe(false);
         expect(result.secrets).toEqual(FAKE_SECRETS);
+    });
+
+    it("migrates legacy per-cache key into unified secure store", async () => {
+        const cacheKey = `secret-cache:${FAKE_PROJECT_CONFIG.workspace_slug}/${FAKE_PROJECT_CONFIG.project_slug}/${FAKE_PROJECT_CONFIG.environment_id}`;
+        await mockKeyring.set(
+            cacheKey,
+            legacyEncode({
+                secrets: FAKE_SECRETS,
+                timestamp: NOW,
+            }),
+        );
+
+        const fetcher = makeFetcher();
+        const result = await fetchSecretsWithCache(FAKE_PROJECT_CONFIG, defaultRunOptions, {}, fetcher);
+
+        expect(fetcher).not.toHaveBeenCalled();
+        expect(result.fromCache).toBe(true);
+        expect(result.cacheReason).toBe("ttl");
+        expect(result.secrets).toEqual(FAKE_SECRETS);
+        expect(await mockKeyring.get(cacheKey)).toBeNull();
+
+        const stored = await mockKeyring.get("enkryptify");
+        expect(JSON.parse(stored!)).toEqual({
+            version: 1,
+            secretCache: {
+                [cacheKey]: {
+                    secrets: FAKE_SECRETS,
+                    timestamp: NOW,
+                },
+            },
+        });
     });
 });

@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
-import { keyring } from "@/lib/keyring";
+import { secureStore } from "@/lib/secureStore";
 import { Auth } from "@/api/auth";
 import { config as configManager } from "@/lib/config";
 import { LoginFlow } from "@/ui/LoginFlow";
@@ -21,25 +21,18 @@ export function registerLoginCommand(program: Command) {
             // when the user is already logged in.
             if (!options?.force) {
                 try {
-                    const authDataString = await keyring.get("enkryptify");
-                    if (authDataString) {
-                        const authData = JSON.parse(authDataString) as {
-                            accessToken: string;
-                            userId: string;
-                            email: string;
-                        };
-                        if (authData.accessToken) {
-                            // Verify the token is still valid
-                            const auth = new Auth();
-                            const userInfo = await auth.getUserInfo(authData.accessToken).catch(() => null);
-                            if (userInfo) {
-                                logger.info(
-                                    'Already logged in. Use "ek login --force" to re-authenticate with a different account.',
-                                );
-                                await configManager.markAuthenticated();
-                                tracker.success();
-                                return;
-                            }
+                    const authData = await secureStore.getAuth();
+                    if (authData?.accessToken) {
+                        // Verify the token is still valid
+                        const auth = new Auth();
+                        const userInfo = await auth.getUserInfo(authData.accessToken).catch(() => null);
+                        if (userInfo) {
+                            logger.info(
+                                'Already logged in. Use "ek login --force" to re-authenticate with a different account.',
+                            );
+                            await configManager.markAuthenticated();
+                            tracker.success();
+                            return;
                         }
                     }
                 } catch {
@@ -59,15 +52,9 @@ export function registerLoginCommand(program: Command) {
                 onComplete: async () => {
                     // Identify user in analytics after successful login
                     try {
-                        const authDataString = await keyring.get("enkryptify");
-                        if (authDataString) {
-                            const authData = JSON.parse(authDataString) as {
-                                userId: string;
-                                email: string;
-                            };
-                            if (authData.userId && authData.email) {
-                                analytics.identify(authData.userId, authData.email);
-                            }
+                        const authData = await secureStore.getAuth();
+                        if (authData) {
+                            analytics.identify(authData.userId, authData.email);
                         }
                     } catch {
                         // Best-effort

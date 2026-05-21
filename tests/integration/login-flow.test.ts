@@ -166,7 +166,7 @@ describe("Auth.login() flow (integration)", () => {
         // New token should be stored (old one replaced)
         const stored = await mockKeyring.get("enkryptify");
         const parsed = JSON.parse(stored!);
-        expect(parsed.accessToken).toBe("new-access-token-xyz");
+        expect(parsed.auth.accessToken).toBe("new-access-token-xyz");
     }, 5000);
 
     // --- PKCE flow ---
@@ -260,9 +260,14 @@ describe("Auth.login() flow (integration)", () => {
         const stored = await mockKeyring.get("enkryptify");
         expect(stored).toBeTruthy();
         const parsed = JSON.parse(stored!);
-        expect(parsed.accessToken).toBe("new-access-token-xyz");
-        expect(parsed.userId).toBe("user-test-123");
-        expect(parsed.email).toBe("test@enkryptify.com");
+        expect(parsed).toEqual({
+            version: 1,
+            auth: {
+                accessToken: "new-access-token-xyz",
+                userId: "user-test-123",
+                email: "test@enkryptify.com",
+            },
+        });
     }, 5000);
 
     it("calls config.markAuthenticated() after storing token", async () => {
@@ -335,6 +340,6 @@ describe("Auth.login() flow (integration)", () => {
         // New token should be stored
         const stored = await mockKeyring.get("enkryptify");
         const parsed = JSON.parse(stored!);
-        expect(parsed.accessToken).toBe("new-access-token-xyz");
+        expect(parsed.auth.accessToken).toBe("new-access-token-xyz");
     }, 5000);
 });

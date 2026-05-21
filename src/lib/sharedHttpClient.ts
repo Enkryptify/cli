@@ -1,12 +1,7 @@
 import { CLIError } from "@/lib/errors";
-import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
+import { secureStore } from "@/lib/secureStore";
 import axios, { type AxiosError, type AxiosInstance } from "axios";
-
-type StoredAuthData = {
-    accessToken: string;
-    [key: string]: string;
-};
 
 export type HttpClientConfig = {
     baseURL: string;
@@ -66,12 +61,7 @@ export function createAuthenticatedHttpClient(config: HttpClientConfig): AxiosIn
     http.interceptors.request.use(
         async (requestConfig) => {
             try {
-                const authDataString = await keyring.get(config.keyringKey);
-                if (!authDataString) {
-                    return requestConfig;
-                }
-
-                const authData = JSON.parse(authDataString) as StoredAuthData;
+                const authData = await secureStore.getAuth();
                 const token = authData?.accessToken;
 
                 if (

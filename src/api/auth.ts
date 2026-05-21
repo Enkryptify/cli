@@ -2,7 +2,7 @@ import { env } from "@/env";
 import { config as configManager } from "@/lib/config";
 import { CLIError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { keyring } from "@/lib/keyring";
+import { secureStore } from "@/lib/secureStore";
 import http from "@/api/httpClient";
 import { createHash, randomBytes } from "crypto";
 import open from "open";
@@ -28,18 +28,11 @@ type AuthResponse = {
     expiresIn: number;
 };
 
-type StoredAuthData = {
-    accessToken: string;
-    userId: string;
-    email: string;
-};
-
 function base64Url(buf: Buffer) {
     return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+/g, "");
 }
 
 export class Auth {
-    private readonly KEYRING_KEY = "enkryptify";
     private readonly CLIENT_ID = "enkryptify-cli";
     private readonly REDIRECT_URL = "http://localhost:51823/callback";
     private readonly CALLBACK_PORT = 51823;
@@ -58,7 +51,7 @@ export class Auth {
 
         if (envToken) {
             if (options?.force) {
-                await keyring.delete(this.KEYRING_KEY);
+                await secureStore.clearAll();
             } else {
                 const isAuth = await this.getUserInfo(envToken).catch(() => false);
                 if (isAuth) {
@@ -69,7 +62,7 @@ export class Auth {
                     await configManager.markAuthenticated();
                     return;
                 } else {
-                    await keyring.delete(this.KEYRING_KEY);
+                    await secureStore.clearAll();
                 }
             }
         }
@@ -374,14 +367,11 @@ h1{font-size:18px;font-weight:600;color:#e4e8ec;letter-spacing:-.01em;margin:0}
     }
 
     private async markAuthenticated(accessToken: string, user: UserInfo): Promise<void> {
-        await keyring.set(
-            this.KEYRING_KEY,
-            JSON.stringify({
-                accessToken,
-                userId: user.id,
-                email: user.email,
-            }),
-        );
+        await secureStore.setAuth({
+            accessToken,
+            userId: user.id,
+            email: user.email,
+        });
 
         await configManager.markAuthenticated();
     }
@@ -410,21 +400,11 @@ h1{font-size:18px;font-weight:600;color:#e4e8ec;letter-spacing:-.01em;margin:0}
     }
 
     async getCredentials(): Promise<Credentials> {
-        const authDataString = await keyring.get(this.KEYRING_KEY);
-        if (!authDataString) {
+        const authData = await secureStore.getAuth();
+        if (!authData?.accessToken) {
             throw CLIError.from("AUTH_NOT_LOGGED_IN");
         }
 
-        try {
-            const authData = JSON.parse(authDataString) as StoredAuthData;
-            if (!authData || !authData.accessToken) {
-                throw CLIError.from("AUTH_NOT_LOGGED_IN");
-            }
-            return { accessToken: authData.accessToken };
-        } catch (error: unknown) {
-            if (error instanceof CLIError) throw error;
-            logger.debug(error instanceof Error ? error.message : String(error));
-            throw CLIError.from("AUTH_NOT_LOGGED_IN");
-        }
+        return { accessToken: authData.accessToken };
     }
 }

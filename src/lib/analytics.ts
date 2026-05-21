@@ -1,25 +1,9 @@
 import { env } from "@/env";
-import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
 import { CLIError } from "@/lib/errors";
 import { loadConfig, saveConfig } from "@/lib/config";
+import { type StoredAuthData, secureStore } from "@/lib/secureStore";
 import { randomUUID } from "crypto";
-
-type StoredAuthData = {
-    accessToken: string;
-    userId: string;
-    email: string;
-};
-
-function isValidStoredAuthData(value: unknown): value is StoredAuthData {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        typeof (value as Record<string, unknown>).accessToken === "string" &&
-        typeof (value as Record<string, unknown>).userId === "string" &&
-        typeof (value as Record<string, unknown>).email === "string"
-    );
-}
 
 export type CommandTracker = {
     success(properties?: Record<string, unknown>): void;
@@ -104,7 +88,9 @@ function getSelfSpawnCommand(): string[] {
 }
 
 export const analytics = {
-    async init(): Promise<void> {
+    // `skipAuthLookup` avoids reading the keychain for commands that don't need auth
+    // (e.g. "ek scan"), so they never trigger a keychain password prompt.
+    async init(options?: { skipAuthLookup?: boolean }): Promise<void> {
         if (isTestEnvironment() || isOptedOut()) {
             enabled = false;
             return;
@@ -127,16 +113,15 @@ export const analytics = {
 
             distinctId = anonymousId;
 
-            try {
-                const authDataString = await keyring.get("enkryptify");
-                if (authDataString) {
-                    const parsed: unknown = JSON.parse(authDataString);
-                    if (isValidStoredAuthData(parsed)) {
-                        distinctId = parsed.userId;
+            if (!options?.skipAuthLookup) {
+                try {
+                    const authData: StoredAuthData | null = await secureStore.getAuth();
+                    if (authData) {
+                        distinctId = authData.userId;
                     }
+                } catch {
+                    // Best-effort, continue with anonymous ID
                 }
-            } catch {
-                // Best-effort, continue with anonymous ID
             }
 
             superProperties = {
@@ -148,6 +133,19 @@ export const analytics = {
             };
 
             enabled = true;
+
+            // One usage event per invocation. $set writes these as person properties
+            // (last-write-wins), so each person is counted under their current version:
+            // after an upgrade they move to the new version instead of being
+            // double-counted on the old one.
+            analytics.track("version_usage", {
+                $set: {
+                    cli_version: env.CLI_VERSION,
+                    os: process.platform,
+                    arch: process.arch,
+                    node_version: process.version,
+                },
+            });
         } catch {
             // Analytics initialization should never break the CLI
             enabled = false;

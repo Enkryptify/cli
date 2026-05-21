@@ -21,6 +21,7 @@ vi.mock("@/lib/logger");
 import { createAuthenticatedHttpClient } from "@/lib/sharedHttpClient";
 
 const BASE_URL = "http://localhost:9876";
+const UNIFIED_AUTH_STORE = { version: 1, auth: FAKE_AUTH_DATA };
 
 const server = setupServer();
 
@@ -53,7 +54,7 @@ describe("createAuthenticatedHttpClient (integration)", () => {
     // --- Request interceptor tests ---
 
     it("adds Authorization header from keyring", async () => {
-        mockKeyring.seed({ enkryptify: JSON.stringify(FAKE_AUTH_DATA) });
+        mockKeyring.seed({ enkryptify: JSON.stringify(UNIFIED_AUTH_STORE) });
 
         let capturedHeaders: Headers | null = null;
         server.use(
@@ -71,7 +72,7 @@ describe("createAuthenticatedHttpClient (integration)", () => {
     });
 
     it("prepends 'Bearer ' prefix to token", async () => {
-        mockKeyring.seed({ enkryptify: JSON.stringify(FAKE_AUTH_DATA) });
+        mockKeyring.seed({ enkryptify: JSON.stringify(UNIFIED_AUTH_STORE) });
 
         let capturedHeaders: Headers | null = null;
         server.use(
@@ -123,7 +124,7 @@ describe("createAuthenticatedHttpClient (integration)", () => {
     });
 
     it("does not overwrite an existing auth header", async () => {
-        mockKeyring.seed({ enkryptify: JSON.stringify(FAKE_AUTH_DATA) });
+        mockKeyring.seed({ enkryptify: JSON.stringify(UNIFIED_AUTH_STORE) });
 
         let capturedHeaders: Headers | null = null;
         server.use(

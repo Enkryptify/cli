@@ -166,6 +166,12 @@ describe("client.configure() flow (integration)", () => {
         expect(confirm).toHaveBeenCalledWith("Setup already exists. Overwrite?");
     });
 
+    it("checks existing setup in the selected scope", async () => {
+        await client.configure("/tmp/test", { scope: "git" });
+
+        expect(config.getConfigure).toHaveBeenCalledWith("/tmp/test", { scope: "git" });
+    });
+
     it("returns existing config when user declines overwrite", async () => {
         const existingConfig = {
             path: "/tmp/test",

@@ -1,7 +1,7 @@
 import { Auth } from "@/api/auth";
 import { analytics } from "@/lib/analytics";
-import { keyring } from "@/lib/keyring";
 import { logger } from "@/lib/logger";
+import { secureStore } from "@/lib/secureStore";
 import type { Command } from "commander";
 
 export function registerWhoamiCommand(program: Command) {
@@ -12,22 +12,8 @@ export function registerWhoamiCommand(program: Command) {
             const tracker = analytics.trackCommand("command_whoami", {});
 
             try {
-                const authDataString = await keyring.get("enkryptify");
-                if (!authDataString) {
-                    logger.warn("Not logged in.", {
-                        fix: 'Run "ek login" to authenticate.',
-                    });
-                    tracker.success();
-                    return;
-                }
-
-                const authData = JSON.parse(authDataString) as {
-                    accessToken: string;
-                    userId: string;
-                    email: string;
-                };
-
-                if (!authData.accessToken) {
+                const authData = await secureStore.getAuth();
+                if (!authData?.accessToken) {
                     logger.warn("Not logged in.", {
                         fix: 'Run "ek login" to authenticate.',
                     });
