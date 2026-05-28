@@ -44,11 +44,25 @@ describe("configure command", () => {
     });
 
     it("uses git scope when --git is provided", async () => {
+        vi.mocked(getGitRepoInfo).mockResolvedValue({
+            root: "/tmp/repo",
+            commonDir: "/tmp/repo/.git",
+            setupKey: "git:/tmp/repo/.git",
+        });
+
         await configure({ git: true });
 
         expect(selectName).not.toHaveBeenCalled();
         expect(client.configure).toHaveBeenCalledWith("/tmp/repo", { scope: "git" });
         expect(config.createConfigure).toHaveBeenCalledWith("/tmp/repo", FAKE_PROJECT_CONFIG, { scope: "git" });
+    });
+
+    it("throws when --git is used outside a git repository (before any API call)", async () => {
+        vi.mocked(getGitRepoInfo).mockResolvedValue(null);
+
+        await expect(configure({ git: true })).rejects.toThrow("No Git repository found.");
+        expect(client.configure).not.toHaveBeenCalled();
+        expect(config.createConfigure).not.toHaveBeenCalled();
     });
 
     it("asks for setup scope inside a git repo and defaults to git option", async () => {

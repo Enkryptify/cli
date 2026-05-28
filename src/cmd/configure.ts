@@ -15,11 +15,20 @@ const GIT_SCOPE_LABEL = "Git repository (recommended)";
 const PATH_SCOPE_LABEL = "This path only";
 
 async function resolveConfigureScope(projectPath: string, options: ConfigureCommandOptions): Promise<ConfigureScope> {
+    const gitRepo = await getGitRepoInfo(projectPath);
+
     if (options.git) {
+        if (!gitRepo) {
+            throw new CLIError(
+                "No Git repository found.",
+                "The current directory is not inside a Git repository.",
+                'Run "ek configure" without --git to set up this path, or run it from inside a Git repository.',
+                "/cli/troubleshooting#configuration",
+            );
+        }
         return "git";
     }
 
-    const gitRepo = await getGitRepoInfo(projectPath);
     if (!gitRepo) {
         return "path";
     }

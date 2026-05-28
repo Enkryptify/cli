@@ -99,11 +99,24 @@ class EnkryptifyClient {
     }
 
     async configure(options: string, configureOptions?: { scope?: ConfigureScope }): Promise<ProjectConfig> {
+        const scope = configureOptions?.scope ?? "path";
         const setup = await config.getConfigure(options, configureOptions);
         if (setup) {
             const overwrite = await confirm("Setup already exists. Overwrite?");
             if (!overwrite) {
                 return setup;
+            }
+        } else if (scope === "git") {
+            // A path-only setup for this same directory would shadow the Git
+            // setup. Detect it and confirm replacing it before continuing.
+            const pathSetup = await config.getConfigure(options, { scope: "path" }).catch(() => null);
+            if (pathSetup) {
+                const replace = await confirm(
+                    "A path-only setup already exists for this directory. Replace it with a Git-repository setup?",
+                );
+                if (!replace) {
+                    return pathSetup;
+                }
             }
         }
 

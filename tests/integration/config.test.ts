@@ -259,6 +259,73 @@ describe("config (integration)", () => {
         expect(found.path).toBe(path.resolve(childPath));
     });
 
+    it("does not let an ancestor path setup shadow a git-scoped repo", async () => {
+        const ancestorPath = path.join(tmpDir, "ancestor");
+        const repoPath = path.join(ancestorPath, "repo");
+        const subdirPath = path.join(repoPath, "src");
+        fs.mkdirSync(subdirPath, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+
+        // Ancestor directory configured with path scope.
+        await config.createConfigure(ancestorPath, {
+            path: ancestorPath,
+            workspace_slug: "ws-ancestor",
+            project_slug: "proj-ancestor",
+            environment_id: "env-ancestor",
+        });
+
+        // The repo itself configured with git scope.
+        await config.createConfigure(
+            repoPath,
+            {
+                path: repoPath,
+                workspace_slug: "ws-git",
+                project_slug: "proj-git",
+                environment_id: "env-git",
+            },
+            { scope: "git" },
+        );
+
+        const found = await config.findProjectConfig(subdirPath);
+        expect(found.workspace_slug).toBe("ws-git");
+        expect(found.path).toMatch(/^git:/);
+    });
+
+    it("switching a directory from path to git scope removes the stale path setup", async () => {
+        const repoPath = path.join(tmpDir, "switch-scope");
+        fs.mkdirSync(repoPath, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+
+        // First configured as path scope.
+        await config.createConfigure(repoPath, {
+            path: repoPath,
+            workspace_slug: "ws-path",
+            project_slug: "proj-path",
+            environment_id: "env-path",
+        });
+
+        // Re-configured as git scope for the same directory.
+        await config.createConfigure(
+            repoPath,
+            {
+                path: repoPath,
+                workspace_slug: "ws-git",
+                project_slug: "proj-git",
+                environment_id: "env-git",
+            },
+            { scope: "git" },
+        );
+
+        const stored = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        const keys = Object.keys(stored.setups);
+        expect(keys).toHaveLength(1);
+        expect(keys[0]).toMatch(/^git:/);
+
+        const found = await config.findProjectConfig(repoPath);
+        expect(found.workspace_slug).toBe("ws-git");
+        expect(found.path).toMatch(/^git:/);
+    });
+
     it("throws CLIError when no config found", async () => {
         const randomPath = path.join(tmpDir, "no-config-here");
         fs.mkdirSync(randomPath, { recursive: true });
