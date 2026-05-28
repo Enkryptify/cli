@@ -97,38 +97,14 @@ describe("secureStore", () => {
         });
     });
 
-    it("migrates a legacy per-cache key into the unified item", async () => {
+    it("leaves legacy per-cache keychain items untouched", async () => {
+        // The unified store no longer reads or migrates legacy per-key items,
+        // so any leftover legacy entry stays exactly as-is (never accessed).
         const cacheKey = "secret-cache:test-workspace/test-project/env-test-123";
-        const entry = { secrets: FAKE_SECRETS, timestamp: 1700000000000 };
-        await mockKeyring.set(cacheKey, encodeLegacyCache(entry));
+        const legacy = encodeLegacyCache({ secrets: FAKE_SECRETS, timestamp: 1700000000000 });
+        await mockKeyring.set(cacheKey, legacy);
 
-        const migrated = await secureStore.migrateLegacySecretCacheEntry(cacheKey, (raw) => {
-            try {
-                return JSON.parse(Buffer.from(raw, "base64").toString("utf8"));
-            } catch {
-                return null;
-            }
-        });
-
-        expect(migrated).toEqual(entry);
-        expect(await mockKeyring.get(cacheKey)).toBeNull();
-        const raw = await mockKeyring.get("enkryptify");
-        expect(JSON.parse(raw!)).toEqual({
-            version: 1,
-            secretCache: {
-                [cacheKey]: entry,
-            },
-        });
-    });
-
-    it("ignores corrupted legacy per-cache data", async () => {
-        const cacheKey = "secret-cache:test-workspace/test-project/env-test-123";
-        await mockKeyring.set(cacheKey, "not-valid-base64-!!!@@@");
-
-        const migrated = await secureStore.migrateLegacySecretCacheEntry(cacheKey, () => null);
-
-        expect(migrated).toBeNull();
-        expect(await mockKeyring.get("enkryptify")).toBeNull();
-        expect(await mockKeyring.get(cacheKey)).toBe("not-valid-base64-!!!@@@");
+        await expect(secureStore.getSecretCacheEntry(cacheKey)).resolves.toBeNull();
+        expect(await mockKeyring.get(cacheKey)).toBe(legacy);
     });
 });

@@ -259,9 +259,8 @@ describe("fetchSecretsWithCache (integration)", () => {
     // --- Corrupted cache ---
 
     it("corrupted cache data returns null (does not crash)", async () => {
-        // Manually write garbage into the keyring at the expected cache key
-        const cacheKey = `secret-cache:${FAKE_PROJECT_CONFIG.workspace_slug}/${FAKE_PROJECT_CONFIG.project_slug}/${FAKE_PROJECT_CONFIG.environment_id}`;
-        await mockKeyring.set(cacheKey, "not-valid-base64-!!!@@@");
+        // Manually write garbage into the unified secure-store item
+        await mockKeyring.set("enkryptify", "not-valid-json-!!!@@@");
 
         // Should treat corrupted cache as a miss and call fetcher
         const fetcher = makeFetcher();
@@ -271,7 +270,8 @@ describe("fetchSecretsWithCache (integration)", () => {
         expect(result.secrets).toEqual(FAKE_SECRETS);
     });
 
-    it("migrates legacy per-cache key into unified secure store", async () => {
+    it("never reads or deletes legacy per-cache keychain items", async () => {
+        // A leftover legacy item from before the unified-store migration.
         const cacheKey = `secret-cache:${FAKE_PROJECT_CONFIG.workspace_slug}/${FAKE_PROJECT_CONFIG.project_slug}/${FAKE_PROJECT_CONFIG.environment_id}`;
         await mockKeyring.set(
             cacheKey,
@@ -284,21 +284,11 @@ describe("fetchSecretsWithCache (integration)", () => {
         const fetcher = makeFetcher();
         const result = await fetchSecretsWithCache(FAKE_PROJECT_CONFIG, defaultRunOptions, {}, fetcher);
 
-        expect(fetcher).not.toHaveBeenCalled();
-        expect(result.fromCache).toBe(true);
-        expect(result.cacheReason).toBe("ttl");
+        // The legacy item is ignored: we fetch fresh instead of reading it,
+        // and the legacy item is left untouched (no keychain access -> no prompt).
+        expect(fetcher).toHaveBeenCalledOnce();
+        expect(result.fromCache).toBe(false);
         expect(result.secrets).toEqual(FAKE_SECRETS);
-        expect(await mockKeyring.get(cacheKey)).toBeNull();
-
-        const stored = await mockKeyring.get("enkryptify");
-        expect(JSON.parse(stored!)).toEqual({
-            version: 1,
-            secretCache: {
-                [cacheKey]: {
-                    secrets: FAKE_SECRETS,
-                    timestamp: NOW,
-                },
-            },
-        });
+        expect(await mockKeyring.get(cacheKey)).toBe(legacyEncode({ secrets: FAKE_SECRETS, timestamp: NOW }));
     });
 });

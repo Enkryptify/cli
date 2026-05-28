@@ -15,11 +15,20 @@ const GIT_SCOPE_LABEL = "Git repository (recommended)";
 const PATH_SCOPE_LABEL = "This path only";
 
 async function resolveConfigureScope(projectPath: string, options: ConfigureCommandOptions): Promise<ConfigureScope> {
+    const gitRepo = await getGitRepoInfo(projectPath);
+
     if (options.git) {
+        if (!gitRepo) {
+            throw new CLIError(
+                "No Git repository found.",
+                "The current directory is not inside a Git repository.",
+                'Run "ek configure" without --git to set up this path, or run it from inside a Git repository.',
+                "/cli/troubleshooting#configuration",
+            );
+        }
         return "git";
     }
 
-    const gitRepo = await getGitRepoInfo(projectPath);
     if (!gitRepo) {
         return "path";
     }
@@ -41,11 +50,15 @@ export async function configure(options: ConfigureCommandOptions = {}): Promise<
     const projectPath = process.cwd();
     const scope = await resolveConfigureScope(projectPath, options);
 
-    const projectConfig = await client.configure(projectPath, { scope });
+    const outcome = await client.configure(projectPath, { scope });
 
-    await config.createConfigure(projectPath, projectConfig, { scope });
+    // Only persist when a new/overwritten setup was actually built. When the
+    // user declined to change anything ("kept"), leave the existing config as-is.
+    if (outcome.status === "configured") {
+        await config.createConfigure(projectPath, outcome.config, { scope });
+    }
 
-    return projectConfig;
+    return outcome.config;
 }
 
 export function registerConfigureCommand(program: Command) {

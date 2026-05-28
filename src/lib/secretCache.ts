@@ -28,15 +28,6 @@ function buildCacheKey(workspaceSlug: string, projectSlug: string, environmentKe
     return `${CACHE_KEY_PREFIX}${workspaceSlug}/${projectSlug}/${environmentKey}`;
 }
 
-function decode(encoded: string): CacheEntry | null {
-    try {
-        const json = atob(encoded);
-        return JSON.parse(json) as CacheEntry;
-    } catch {
-        return null;
-    }
-}
-
 async function readCache(key: string): Promise<CacheEntry | null> {
     try {
         return await secureStore.getSecretCacheEntry(key);
@@ -52,10 +43,6 @@ async function writeCache(key: string, secrets: Secret[]): Promise<void> {
     } catch {
         // Keyring unavailable; silently degrade
     }
-}
-
-async function readLegacyCache(key: string): Promise<CacheEntry | null> {
-    return await secureStore.migrateLegacySecretCacheEntry(key, decode);
 }
 
 export async function fetchSecretsWithCache(
@@ -100,7 +87,7 @@ export async function fetchSecretsWithCache(
 
     // --offline: use cache only, never fetch
     if (cacheOptions.offline) {
-        const cached = (await readCache(cacheKey)) ?? (await readLegacyCache(cacheKey));
+        const cached = await readCache(cacheKey);
         if (!cached) {
             throw new CLIError(
                 "No cached secrets available.",
@@ -112,7 +99,7 @@ export async function fetchSecretsWithCache(
     }
 
     // Normal mode: check TTL, fetch if stale, fallback to cache on error
-    const cached = (await readCache(cacheKey)) ?? (await readLegacyCache(cacheKey));
+    const cached = await readCache(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
         return { secrets: cached.secrets, fromCache: true, cacheReason: "ttl" };
     }

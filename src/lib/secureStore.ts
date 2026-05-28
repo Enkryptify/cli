@@ -138,30 +138,4 @@ export const secureStore = {
             };
         });
     },
-
-    async migrateLegacySecretCacheEntry(
-        cacheKey: string,
-        decode: (raw: string) => StoredSecretCacheEntry | null,
-    ): Promise<StoredSecretCacheEntry | null> {
-        try {
-            const raw = await keyring.get(cacheKey);
-            if (!raw) return null;
-
-            const entry = decode(raw);
-            if (!entry) return null;
-
-            await updateStore((store) => {
-                store.secretCache = {
-                    ...(store.secretCache ?? {}),
-                    [cacheKey]: entry,
-                };
-            });
-
-            await keyring.delete(cacheKey).catch(() => undefined);
-
-            return entry;
-        } catch {
-            return null;
-        }
-    },
 };

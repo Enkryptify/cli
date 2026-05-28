@@ -1,5 +1,5 @@
 import { CLIError } from "@/lib/errors";
-import { getGitRepoInfo } from "@/lib/git";
+import { type GitRepoInfo, getGitRepoInfo } from "@/lib/git";
 import { logger } from "@/lib/logger";
 import * as fs from "fs/promises";
 import * as os from "os";
@@ -197,13 +197,15 @@ async function isAuthenticated(): Promise<boolean> {
     return config.providers?.["enkryptify"] != null;
 }
 
-async function getSetupKey(projectPath: string, scope: ConfigureScope): Promise<string> {
+// `gitRepo` may be passed in to avoid re-running git when the caller already
+// resolved it. `undefined` means "not resolved yet", `null` means "resolved, not a repo".
+async function getSetupKey(projectPath: string, scope: ConfigureScope, gitRepo?: GitRepoInfo | null): Promise<string> {
     if (scope === "path") {
         return path.resolve(projectPath);
     }
 
-    const gitRepo = await getGitRepoInfo(projectPath);
-    if (!gitRepo) {
+    const repo = gitRepo === undefined ? await getGitRepoInfo(projectPath) : gitRepo;
+    if (!repo) {
         throw new CLIError(
             "No Git repository found.",
             "The current directory is not inside a Git repository.",
@@ -212,7 +214,7 @@ async function getSetupKey(projectPath: string, scope: ConfigureScope): Promise<
         );
     }
 
-    return gitRepo.setupKey;
+    return repo.setupKey;
 }
 
 async function createConfigureWithOptions(
@@ -221,12 +223,31 @@ async function createConfigureWithOptions(
     options: ConfigureOptions = {},
 ): Promise<void> {
     const config = await loadConfig();
-    const setupKey = await getSetupKey(projectPath, options.scope ?? "path");
+    const scope = options.scope ?? "path";
+    const gitRepo = await getGitRepoInfo(projectPath);
+    const setupKey = await getSetupKey(projectPath, scope, gitRepo);
 
     if (!config.setups) config.setups = {};
 
     const { path: _, ...setupData } = projectConfig;
     config.setups[setupKey] = setupData;
+
+    // When switching this directory to Git scope, drop the now-redundant
+    // path-only setup for the same directory. Otherwise the path entry would
+    // shadow the Git setup in findProjectConfig and the switch would silently
+    // have no effect. We only do this for the same directory, so unrelated
+    // nested path setups elsewhere in the repo are preserved. Both the resolved
+    // and the symlink-canonical path are removed so a stale setup saved under a
+    // symlinked alias (e.g. /var vs /private/var) is also cleared.
+    if (scope === "git") {
+        const pathKey = path.resolve(projectPath);
+        const realPathKey = await fs.realpath(projectPath).catch(() => pathKey);
+        for (const key of new Set([pathKey, realPathKey])) {
+            if (key !== setupKey && config.setups[key]) {
+                delete config.setups[key];
+            }
+        }
+    }
 
     await saveConfig(config);
 }
@@ -245,23 +266,49 @@ async function hasAnyProject(): Promise<boolean> {
 
 async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
     const config = await loadConfig();
+    const setups = config.setups ?? {};
+    const gitRepo = await getGitRepoInfo(startPath);
+
+    // Resolve the repo root through symlinks so the boundary comparison below
+    // is reliable (e.g. macOS /var vs /private/var).
+    let repoRootReal: string | null = null;
+    if (gitRepo) {
+        repoRootReal = await fs.realpath(gitRepo.root).catch(() => path.resolve(gitRepo.root));
+    }
+
     let currentPath = path.resolve(startPath);
     const root = path.parse(currentPath).root;
 
-    while (currentPath !== root) {
-        const normalizedPath = path.resolve(currentPath);
-        const setup = config.setups?.[normalizedPath];
+    // Walk up from the start directory. A path-scoped setup at or below the
+    // repo root is more specific and wins. Once we reach the repo root, prefer
+    // the git-scoped setup over any ancestor path setup above the repo, so a
+    // git-configured repo is never shadowed by an unrelated parent directory.
+    while (true) {
+        const setup = setups[currentPath];
         if (setup) {
-            return { path: normalizedPath, ...setup };
+            return { path: currentPath, ...setup };
         }
+
+        if (gitRepo && repoRootReal) {
+            const currentReal = await fs.realpath(currentPath).catch(() => currentPath);
+            if (currentReal === repoRootReal) {
+                const gitSetup = setups[gitRepo.setupKey];
+                if (gitSetup) {
+                    return { path: gitRepo.setupKey, ...gitSetup };
+                }
+            }
+        }
+
+        if (currentPath === root) break;
         currentPath = path.dirname(currentPath);
     }
 
-    const gitRepo = await getGitRepoInfo(startPath);
+    // Safety net: resolve the git setup even if the repo root wasn't on the
+    // resolved walk path (e.g. symlinked working directories).
     if (gitRepo) {
-        const setup = config.setups?.[gitRepo.setupKey];
-        if (setup) {
-            return { path: gitRepo.setupKey, ...setup };
+        const gitSetup = setups[gitRepo.setupKey];
+        if (gitSetup) {
+            return { path: gitRepo.setupKey, ...gitSetup };
         }
     }
 
