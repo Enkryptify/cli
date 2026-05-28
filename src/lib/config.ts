@@ -236,11 +236,16 @@ async function createConfigureWithOptions(
     // path-only setup for the same directory. Otherwise the path entry would
     // shadow the Git setup in findProjectConfig and the switch would silently
     // have no effect. We only do this for the same directory, so unrelated
-    // nested path setups elsewhere in the repo are preserved.
+    // nested path setups elsewhere in the repo are preserved. Both the resolved
+    // and the symlink-canonical path are removed so a stale setup saved under a
+    // symlinked alias (e.g. /var vs /private/var) is also cleared.
     if (scope === "git") {
         const pathKey = path.resolve(projectPath);
-        if (pathKey !== setupKey && config.setups[pathKey]) {
-            delete config.setups[pathKey];
+        const realPathKey = await fs.realpath(projectPath).catch(() => pathKey);
+        for (const key of new Set([pathKey, realPathKey])) {
+            if (key !== setupKey && config.setups[key]) {
+                delete config.setups[key];
+            }
         }
     }
 

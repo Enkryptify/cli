@@ -22,6 +22,17 @@ export type RunOptions = {
     [key: string]: string | undefined;
 };
 
+// Result of the interactive configure flow. The explicit status lets the
+// caller honor the user's choice instead of inferring intent from a raw
+// ProjectConfig: "configured" means a new/overwritten setup was built and
+// should be persisted; "kept" means the user declined to change anything and
+// nothing should be persisted.
+export type ConfigureOutcome = {
+    status: "configured" | "kept";
+    scope: ConfigureScope;
+    config: ProjectConfig;
+};
+
 type Workspace = {
     id: string;
     name: string;
@@ -98,24 +109,28 @@ class EnkryptifyClient {
         await this.auth.login(options);
     }
 
-    async configure(options: string, configureOptions?: { scope?: ConfigureScope }): Promise<ProjectConfig> {
+    async configure(options: string, configureOptions?: { scope?: ConfigureScope }): Promise<ConfigureOutcome> {
         const scope = configureOptions?.scope ?? "path";
         const setup = await config.getConfigure(options, configureOptions);
         if (setup) {
             const overwrite = await confirm("Setup already exists. Overwrite?");
             if (!overwrite) {
-                return setup;
+                return { status: "kept", scope, config: setup };
             }
         } else if (scope === "git") {
             // A path-only setup for this same directory would shadow the Git
             // setup. Detect it and confirm replacing it before continuing.
-            const pathSetup = await config.getConfigure(options, { scope: "path" }).catch(() => null);
+            // getConfigure returns null when no path setup exists, so any thrown
+            // error here is a genuine read failure and should propagate.
+            const pathSetup = await config.getConfigure(options, { scope: "path" });
             if (pathSetup) {
                 const replace = await confirm(
                     "A path-only setup already exists for this directory. Replace it with a Git-repository setup?",
                 );
                 if (!replace) {
-                    return pathSetup;
+                    // The user declined: keep the existing path setup untouched
+                    // and report the effective scope so nothing is persisted.
+                    return { status: "kept", scope: "path", config: pathSetup };
                 }
             }
         }
@@ -251,7 +266,7 @@ class EnkryptifyClient {
             `Setup completed successfully! Workspace: ${selectedWorkspace.name}, Project: ${selectedProject.name}, Environment: ${environmentName}`,
         );
 
-        return projectConfig;
+        return { status: "configured", scope, config: projectConfig };
     }
 
     async run(config: ProjectConfig, options?: RunOptions): Promise<Secret[]> {

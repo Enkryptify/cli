@@ -36,7 +36,11 @@ describe("configure command", () => {
         vi.spyOn(process, "cwd").mockReturnValue("/tmp/repo");
         vi.mocked(config.isAuthenticated).mockResolvedValue(true);
         vi.mocked(config.createConfigure).mockResolvedValue(undefined);
-        vi.mocked(client.configure).mockResolvedValue(FAKE_PROJECT_CONFIG);
+        vi.mocked(client.configure).mockResolvedValue({
+            status: "configured",
+            scope: "path",
+            config: FAKE_PROJECT_CONFIG,
+        });
     });
 
     afterEach(() => {
@@ -91,5 +95,23 @@ describe("configure command", () => {
         expect(selectName).not.toHaveBeenCalled();
         expect(client.configure).toHaveBeenCalledWith("/tmp/repo", { scope: "path" });
         expect(config.createConfigure).toHaveBeenCalledWith("/tmp/repo", FAKE_PROJECT_CONFIG, { scope: "path" });
+    });
+
+    it('does not persist when the configure flow reports "kept" (user declined)', async () => {
+        vi.mocked(getGitRepoInfo).mockResolvedValue({
+            root: "/tmp/repo",
+            commonDir: "/tmp/repo/.git",
+            setupKey: "git:/tmp/repo/.git",
+        });
+        vi.mocked(selectName).mockResolvedValue("Git repository (recommended)");
+        vi.mocked(client.configure).mockResolvedValue({
+            status: "kept",
+            scope: "path",
+            config: FAKE_PROJECT_CONFIG,
+        });
+
+        await configure();
+
+        expect(config.createConfigure).not.toHaveBeenCalled();
     });
 });

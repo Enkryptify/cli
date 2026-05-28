@@ -59,10 +59,11 @@ describe("client.configure() flow (integration)", () => {
     it("returns ProjectConfig with correct workspace_slug, project_slug, environment_id", async () => {
         const result = await client.configure("/tmp/test");
 
-        expect(result.workspace_slug).toBe("test-workspace");
-        expect(result.project_slug).toBe("test-project");
-        expect(result.environment_id).toBe("env-test-123");
-        expect(result.path).toBe("/tmp/test");
+        expect(result.status).toBe("configured");
+        expect(result.config.workspace_slug).toBe("test-workspace");
+        expect(result.config.project_slug).toBe("test-project");
+        expect(result.config.environment_id).toBe("env-test-123");
+        expect(result.config.path).toBe("/tmp/test");
     });
 
     it("fetches projects for the selected workspace (correct slug in URL)", async () => {
@@ -172,6 +173,31 @@ describe("client.configure() flow (integration)", () => {
         expect(config.getConfigure).toHaveBeenCalledWith("/tmp/test", { scope: "git" });
     });
 
+    it("keeps the path setup when the user declines the git replacement", async () => {
+        const pathSetup = {
+            path: "/tmp/test",
+            workspace_slug: "path-ws",
+            project_slug: "path-proj",
+            environment_id: "path-env",
+        };
+        // No git-scoped setup yet, but a path-scoped one exists for this dir.
+        vi.mocked(config.getConfigure).mockImplementation(async (_path: string, options?: { scope?: string }) =>
+            options?.scope === "path" ? pathSetup : null,
+        );
+        vi.mocked(confirm).mockResolvedValue(false);
+
+        const result = await client.configure("/tmp/test", { scope: "git" });
+
+        expect(confirm).toHaveBeenCalledWith(
+            "A path-only setup already exists for this directory. Replace it with a Git-repository setup?",
+        );
+        expect(result.status).toBe("kept");
+        expect(result.scope).toBe("path");
+        expect(result.config).toBe(pathSetup);
+        // Declining must not start the configure flow.
+        expect(http.get).not.toHaveBeenCalled();
+    });
+
     it("returns existing config when user declines overwrite", async () => {
         const existingConfig = {
             path: "/tmp/test",
@@ -184,7 +210,8 @@ describe("client.configure() flow (integration)", () => {
 
         const result = await client.configure("/tmp/test");
 
-        expect(result).toBe(existingConfig);
+        expect(result.status).toBe("kept");
+        expect(result.config).toBe(existingConfig);
         // Should not have fetched workspaces
         expect(http.get).not.toHaveBeenCalled();
     });

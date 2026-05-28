@@ -50,11 +50,15 @@ export async function configure(options: ConfigureCommandOptions = {}): Promise<
     const projectPath = process.cwd();
     const scope = await resolveConfigureScope(projectPath, options);
 
-    const projectConfig = await client.configure(projectPath, { scope });
+    const outcome = await client.configure(projectPath, { scope });
 
-    await config.createConfigure(projectPath, projectConfig, { scope });
+    // Only persist when a new/overwritten setup was actually built. When the
+    // user declined to change anything ("kept"), leave the existing config as-is.
+    if (outcome.status === "configured") {
+        await config.createConfigure(projectPath, outcome.config, { scope });
+    }
 
-    return projectConfig;
+    return outcome.config;
 }
 
 export function registerConfigureCommand(program: Command) {
