@@ -1,6 +1,10 @@
 import { promises as fs } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseDotenvContent } from "@/cmd/import";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe("parseDotenvContent", () => {
     it("parses common dotenv syntax", () => {
@@ -45,7 +49,7 @@ JSON_VALUE="{
     });
 
     it("parses the provided sample env file", async () => {
-        const content = await fs.readFile("/Users/siebebaree/Documents/Enkryptify/test.env", "utf8");
+        const content = await fs.readFile(path.join(__dirname, "../fixtures/test.env"), "utf8");
         const secrets = parseDotenvContent(content);
 
         expect(secrets).toHaveLength(13);
