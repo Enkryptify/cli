@@ -80,9 +80,13 @@ export const FAKE_ENVIRONMENTS = [
 
 export const FAKE_PROJECTS = [
     {
+        id: "team-1",
+        name: "Test Team",
         projects: [
             { id: "proj-1", name: "Test Project", slug: "test-project" },
             { id: "proj-2", name: "Other Project", slug: "other-project" },
         ],
     },
 ];
+
+export const FAKE_TEAMS = [{ id: "team-1", name: "Test Team", projectCount: 2, createdAt: new Date().toISOString() }];

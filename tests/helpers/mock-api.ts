@@ -1,5 +1,5 @@
 import { HttpResponse, http } from "msw";
-import { FAKE_API_SECRETS, FAKE_ENVIRONMENTS, FAKE_PROJECTS, FAKE_WORKSPACES } from "./fixtures";
+import { FAKE_API_SECRETS, FAKE_ENVIRONMENTS, FAKE_PROJECTS, FAKE_TEAMS, FAKE_WORKSPACES } from "./fixtures";
 
 const API_BASE = "https://api.enkryptify.com";
 
@@ -14,9 +14,23 @@ export const handlers = [
         return HttpResponse.json(FAKE_PROJECTS);
     }),
 
+    http.post(`${API_BASE}/v1/workspace/:slug/project`, async ({ request }) => {
+        const body = (await request.json()) as { name: string; slug: string };
+        return HttpResponse.json({ id: "proj-created", name: body.name, slug: body.slug }, { status: 201 });
+    }),
+
+    // Teams
+    http.get(`${API_BASE}/v1/workspace/:slug/team`, () => {
+        return HttpResponse.json(FAKE_TEAMS);
+    }),
+
     // Environments
     http.get(`${API_BASE}/v1/workspace/:wsSlug/project/:pSlug/environment`, () => {
         return HttpResponse.json(FAKE_ENVIRONMENTS);
+    }),
+
+    http.post(`${API_BASE}/v1/workspace/:wsSlug/project/:pSlug/environment`, () => {
+        return HttpResponse.json({ success: true });
     }),
 
     // Secrets (list + resolve)
