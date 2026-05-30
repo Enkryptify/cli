@@ -46,6 +46,8 @@ type Project = {
 };
 
 type ProjectTeam = {
+    id?: string;
+    name?: string;
     projects: Project[];
 };
 
@@ -54,7 +56,24 @@ type Environment = {
     name: string;
 };
 
-type Resource = Workspace | Project | ProjectTeam | Environment | ApiSecret;
+type Team = {
+    id: string;
+    name: string;
+};
+
+export type ImportSecret = {
+    key: string;
+    value: string;
+};
+
+export type ImportTarget = {
+    config: ProjectConfig;
+    workspaceName: string;
+    projectName: string;
+    environmentName: string;
+};
+
+type Resource = Workspace | Project | ProjectTeam | Environment | Team | ApiSecret;
 
 type ApiSecretValue = {
     environmentId: string;
@@ -67,6 +86,9 @@ type ApiSecret = {
     name: string;
     values: ApiSecretValue[];
 };
+
+const CREATE_PROJECT_LABEL = "Create a new project";
+const CREATE_ENVIRONMENT_LABEL = "Create a new environment";
 
 class EnkryptifyClient {
     private auth: Auth;
@@ -118,10 +140,6 @@ class EnkryptifyClient {
                 return { status: "kept", scope, config: setup };
             }
         } else if (scope === "git") {
-            // A path-only setup for this same directory would shadow the Git
-            // setup. Detect it and confirm replacing it before continuing.
-            // getConfigure returns null when no path setup exists, so any thrown
-            // error here is a genuine read failure and should propagate.
             const pathSetup = await config.getConfigure(options, { scope: "path" });
             if (pathSetup) {
                 const replace = await confirm(
@@ -348,6 +366,38 @@ class EnkryptifyClient {
         });
     }
 
+    async importSecrets(config: ProjectConfig, secrets: ImportSecret[]): Promise<void> {
+        const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
+
+        await http.post(`/v1/workspace/${workspace_slug}/project/${project_slug}/secret`, {
+            environments: [environment_id],
+            secrets: secrets.map((secret) => ({
+                key: secret.key,
+                value: secret.value,
+                type: "runtime",
+                dataType: "text",
+            })),
+        });
+    }
+
+    async selectImportTarget(projectPath: string): Promise<ImportTarget> {
+        const selectedWorkspace = await this.selectWorkspace();
+        const selectedProject = await this.selectProject(selectedWorkspace);
+        const selectedEnvironment = await this.selectEnvironment(selectedWorkspace, selectedProject);
+
+        return {
+            config: {
+                path: projectPath,
+                workspace_slug: selectedWorkspace.slug,
+                project_slug: selectedProject.slug,
+                environment_id: selectedEnvironment.id,
+            },
+            workspaceName: selectedWorkspace.name,
+            projectName: selectedProject.name,
+            environmentName: selectedEnvironment.name,
+        };
+    }
+
     async updateSecret(config: ProjectConfig, name: string, isPersonalFlag?: boolean): Promise<void> {
         const { workspace_slug, project_slug, environment_id } = this.checkProjectConfig(config);
 
@@ -514,6 +564,178 @@ class EnkryptifyClient {
         }
     }
 
+    private async fetchOptionalResource<T>(url: string): Promise<T[]> {
+        try {
+            const response = await http.get<T[]>(url);
+            return response.data ?? [];
+        } catch (error) {
+            if (error instanceof AxiosError && error.response?.status === 404) {
+                return [];
+            }
+            if (error instanceof AxiosError) {
+                const status = error.response?.status;
+                if (status === 401) throw CLIError.from("API_UNAUTHORIZED");
+                if (status === 403) throw CLIError.from("API_FORBIDDEN");
+                if (status && status >= 500) throw CLIError.from("API_SERVER_ERROR");
+                if (!status) throw CLIError.from("API_NETWORK_ERROR");
+            }
+            throw error;
+        }
+    }
+
+    private async selectWorkspace(): Promise<Workspace> {
+        const workspaces = await this.fetchResource<Workspace>("/v1/workspace");
+
+        if (workspaces.length === 1) return first(workspaces);
+
+        const workspaceMap = new Map<string, Workspace>();
+        const workspaceLabels = workspaces.map((ws) => {
+            const label = `${ws.name} (${ws.slug})`;
+            workspaceMap.set(label, ws);
+            return label;
+        });
+
+        const selectedWorkspaceLabel = await selectName(workspaceLabels, "Select workspace");
+        const selectedWorkspace = workspaceMap.get(selectedWorkspaceLabel);
+        if (!selectedWorkspace) {
+            throw new CLIError(
+                "The selected workspace could not be found.",
+                undefined,
+                'Try running "ek import" again.',
+            );
+        }
+
+        return selectedWorkspace;
+    }
+
+    private async selectProject(workspace: Workspace): Promise<Project> {
+        const projectsResponse = await this.fetchOptionalResource<ProjectTeam>(
+            `/v1/workspace/${workspace.slug}/project`,
+        );
+        const projects = projectsResponse.flatMap((team) => team.projects ?? []);
+
+        if (projects.length === 1) return first(projects);
+        if (projects.length === 0) return this.createProjectInteractively(workspace);
+
+        const projectMap = new Map<string, Project>();
+        const projectLabels = projects.map((project) => {
+            const label = `${project.name} (${project.slug})`;
+            projectMap.set(label, project);
+            return label;
+        });
+
+        const selectedProjectLabel = await selectName([...projectLabels, CREATE_PROJECT_LABEL], "Select project");
+        if (selectedProjectLabel === CREATE_PROJECT_LABEL) {
+            return this.createProjectInteractively(workspace);
+        }
+
+        const selectedProject = projectMap.get(selectedProjectLabel);
+        if (!selectedProject) {
+            throw new CLIError("The selected project could not be found.", undefined, 'Try running "ek import" again.');
+        }
+
+        return selectedProject;
+    }
+
+    private async selectEnvironment(workspace: Workspace, project: Project): Promise<Environment> {
+        const environments = await this.fetchOptionalResource<Environment>(
+            `/v1/workspace/${workspace.slug}/project/${project.slug}/environment`,
+        );
+
+        if (environments.length === 1) return first(environments);
+        if (environments.length === 0) return this.createEnvironmentInteractively(workspace, project);
+
+        const environmentName = await selectName(
+            [...environments.map((environment) => environment.name), CREATE_ENVIRONMENT_LABEL],
+            "Select environment",
+        );
+
+        if (environmentName === CREATE_ENVIRONMENT_LABEL) {
+            return this.createEnvironmentInteractively(workspace, project);
+        }
+
+        const selectedEnvironment = environments.find((environment) => environment.name === environmentName);
+        if (!selectedEnvironment) {
+            throw new CLIError(
+                "The selected environment could not be found.",
+                undefined,
+                'Try running "ek import" again.',
+            );
+        }
+
+        return selectedEnvironment;
+    }
+
+    private async createProjectInteractively(workspace: Workspace): Promise<Project> {
+        const teams = await this.fetchResource<Team>(`/v1/workspace/${workspace.slug}/team`);
+        const selectedTeam = await this.selectTeam(teams);
+        const name = (await getTextInput("Project name: ")).trim();
+        if (!name) {
+            throw new CLIError("Project name is required.", undefined, "Enter a project name to continue.");
+        }
+
+        const defaultSlug = slugify(name);
+        const slugInput = (await getTextInput(`Project slug (press Enter to use "${defaultSlug}"): `)).trim();
+        const slug = slugInput || defaultSlug;
+        if (!slug) {
+            throw new CLIError("Project slug is required.", undefined, "Enter a project slug to continue.");
+        }
+
+        const response = await http.post<Project>(`/v1/workspace/${workspace.slug}/project`, {
+            name,
+            slug,
+            teamId: selectedTeam.id,
+        });
+
+        logger.success(`Project created successfully! Name: ${response.data.name}`);
+        return response.data;
+    }
+
+    private async selectTeam(teams: Team[]): Promise<Team> {
+        if (teams.length === 1) return first(teams);
+
+        const teamMap = new Map<string, Team>();
+        const teamLabels = teams.map((team) => {
+            teamMap.set(team.name, team);
+            return team.name;
+        });
+
+        const selectedTeamLabel = await selectName(teamLabels, "Select team for the new project");
+        const selectedTeam = teamMap.get(selectedTeamLabel);
+        if (!selectedTeam) {
+            throw new CLIError("The selected team could not be found.", undefined, 'Try running "ek import" again.');
+        }
+
+        return selectedTeam;
+    }
+
+    private async createEnvironmentInteractively(workspace: Workspace, project: Project): Promise<Environment> {
+        const name = (await getTextInput("Environment name: ")).trim();
+        if (!name) {
+            throw new CLIError("Environment name is required.", undefined, "Enter an environment name to continue.");
+        }
+
+        await http.post(`/v1/workspace/${workspace.slug}/project/${project.slug}/environment`, {
+            name,
+            hasPersonalOverrides: false,
+        });
+
+        const environments = await this.fetchResource<Environment>(
+            `/v1/workspace/${workspace.slug}/project/${project.slug}/environment`,
+        );
+        const environment = environments.find((candidate) => candidate.name === name);
+        if (!environment) {
+            throw new CLIError(
+                `Environment "${name}" was created but could not be loaded.`,
+                undefined,
+                'Try running "ek import" again.',
+            );
+        }
+
+        logger.success(`Environment created successfully! Name: ${environment.name}`);
+        return environment;
+    }
+
     private checkProjectConfig(config: ProjectConfig) {
         const { workspace_slug, project_slug, environment_id } = config;
         if (!workspace_slug || !project_slug || !environment_id) {
@@ -529,3 +751,19 @@ class EnkryptifyClient {
 }
 
 export const client = new EnkryptifyClient();
+
+function slugify(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function first<T>(items: T[]): T {
+    const item = items[0];
+    if (item === undefined) {
+        throw new CLIError("Expected at least one item.");
+    }
+    return item;
+}

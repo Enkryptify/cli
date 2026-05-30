@@ -12,6 +12,8 @@ export type ProjectConfig = {
     [key: string]: string;
 };
 
+export const LOCAL_CONFIG_FILENAME = ".enkryptify.json";
+
 type ConfigureOptions = {
     scope?: ConfigureScope;
 };
@@ -217,6 +219,74 @@ async function getSetupKey(projectPath: string, scope: ConfigureScope, gitRepo?:
     return repo.setupKey;
 }
 
+async function readLocalConfigAt(dir: string): Promise<ProjectConfig | null> {
+    const filePath = path.join(dir, LOCAL_CONFIG_FILENAME);
+
+    let raw: string;
+    try {
+        raw = await fs.readFile(filePath, "utf-8");
+    } catch (err: unknown) {
+        if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+            return null;
+        }
+        throw new CLIError(
+            `Could not read the project file "${filePath}".`,
+            err instanceof Error ? err.message : String(err),
+            "Check the file's permissions and try again.",
+            "/cli/troubleshooting#configuration",
+        );
+    }
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (err: unknown) {
+        throw new CLIError(
+            `The project file "${filePath}" contains invalid JSON.`,
+            err instanceof Error ? err.message : String(err),
+            "Fix the JSON in your .enkryptify.json file.",
+            "/cli/troubleshooting#configuration",
+        );
+    }
+
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        throw new CLIError(
+            `The project file "${filePath}" is not valid.`,
+            "The file must contain a JSON object.",
+            "See https://docs.enkryptify.com for the .enkryptify.json format.",
+            "/cli/troubleshooting#configuration",
+        );
+    }
+
+    const obj = parsed as Record<string, unknown>;
+    const workspace = obj.workspace;
+    const project = obj.project;
+    const environment = obj.environment;
+
+    if (
+        typeof workspace !== "string" ||
+        workspace.length === 0 ||
+        typeof project !== "string" ||
+        project.length === 0 ||
+        typeof environment !== "string" ||
+        environment.length === 0
+    ) {
+        throw new CLIError(
+            `The project file "${filePath}" is missing required fields.`,
+            'It must define non-empty "workspace", "project" and "environment" fields (each may be a slug or an id).',
+            "See https://docs.enkryptify.com for the .enkryptify.json format.",
+            "/cli/troubleshooting#configuration",
+        );
+    }
+
+    return {
+        path: dir,
+        workspace_slug: workspace,
+        project_slug: project,
+        environment_id: environment,
+    };
+}
+
 async function createConfigureWithOptions(
     projectPath: string,
     projectConfig: ProjectConfig,
@@ -278,12 +348,16 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
 
     let currentPath = path.resolve(startPath);
     const root = path.parse(currentPath).root;
+    let aboveRepoRoot = false;
 
-    // Walk up from the start directory. A path-scoped setup at or below the
-    // repo root is more specific and wins. Once we reach the repo root, prefer
-    // the git-scoped setup over any ancestor path setup above the repo, so a
-    // git-configured repo is never shadowed by an unrelated parent directory.
     while (true) {
+        if (!aboveRepoRoot) {
+            const localConfig = await readLocalConfigAt(currentPath);
+            if (localConfig) {
+                return localConfig;
+            }
+        }
+
         const setup = setups[currentPath];
         if (setup) {
             return { path: currentPath, ...setup };
@@ -296,6 +370,8 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
                 if (gitSetup) {
                     return { path: gitRepo.setupKey, ...gitSetup };
                 }
+                // Parent directories from here up are outside the repository.
+                aboveRepoRoot = true;
             }
         }
 
@@ -303,8 +379,6 @@ async function findProjectConfig(startPath: string): Promise<ProjectConfig> {
         currentPath = path.dirname(currentPath);
     }
 
-    // Safety net: resolve the git setup even if the repo root wasn't on the
-    // resolved walk path (e.g. symlinked working directories).
     if (gitRepo) {
         const gitSetup = setups[gitRepo.setupKey];
         if (gitSetup) {

@@ -372,4 +372,113 @@ describe("config (integration)", () => {
         const result = await config.getConfigure("/nonexistent/unknown/path");
         expect(result).toBeNull();
     });
+
+    // --- .enkryptify.json (committed, hand-written, per-directory project file) ---
+
+    const writeLocalFile = (dir: string, data: Record<string, string>) => {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, ".enkryptify.json"), JSON.stringify(data), "utf-8");
+    };
+
+    it("reads a committed .enkryptify.json in the current directory", async () => {
+        const dir = path.join(tmpDir, "apps", "app");
+        writeLocalFile(dir, { workspace: "ws-app", project: "web", environment: "env-dev" });
+
+        const found = await config.findProjectConfig(dir);
+        expect(found.workspace_slug).toBe("ws-app");
+        expect(found.project_slug).toBe("web");
+        expect(found.environment_id).toBe("env-dev");
+        expect(found.path).toBe(path.resolve(dir));
+    });
+
+    it("accepts a slug or an id for each field and passes the value through verbatim", async () => {
+        const dir = path.join(tmpDir, "by-id");
+        writeLocalFile(dir, { workspace: "ws_01H", project: "prj_02K", environment: "env_03M" });
+
+        const found = await config.findProjectConfig(dir);
+        expect(found.workspace_slug).toBe("ws_01H");
+        expect(found.project_slug).toBe("prj_02K");
+        expect(found.environment_id).toBe("env_03M");
+    });
+
+    it("walks up to find a committed .enkryptify.json in a parent directory", async () => {
+        const appDir = path.join(tmpDir, "apps", "app");
+        const deep = path.join(appDir, "src", "components");
+        fs.mkdirSync(deep, { recursive: true });
+        writeLocalFile(appDir, { workspace: "ws", project: "web", environment: "env" });
+
+        const found = await config.findProjectConfig(deep);
+        expect(found.workspace_slug).toBe("ws");
+        expect(found.path).toBe(path.resolve(appDir));
+    });
+
+    it("resolves separate .enkryptify.json files per monorepo app", async () => {
+        const appDir = path.join(tmpDir, "mono", "apps", "app");
+        const apiDir = path.join(tmpDir, "mono", "apps", "api");
+        writeLocalFile(appDir, { workspace: "ws", project: "web", environment: "env" });
+        writeLocalFile(apiDir, { workspace: "ws", project: "api", environment: "env" });
+
+        const app = await config.findProjectConfig(appDir);
+        const api = await config.findProjectConfig(apiDir);
+        expect(app.project_slug).toBe("web");
+        expect(api.project_slug).toBe("api");
+    });
+
+    it("prefers a committed .enkryptify.json over a global path setup at the same directory", async () => {
+        const dir = path.join(tmpDir, "proj");
+        fs.mkdirSync(dir, { recursive: true });
+        await config.createConfigure(dir, {
+            path: dir,
+            workspace_slug: "ws-global",
+            project_slug: "global",
+            environment_id: "env-global",
+        });
+        writeLocalFile(dir, { workspace: "ws-file", project: "file", environment: "env-file" });
+
+        const found = await config.findProjectConfig(dir);
+        expect(found.project_slug).toBe("file");
+    });
+
+    it("prefers a committed .enkryptify.json in a subdir over a git-scoped setup", async () => {
+        const repoPath = path.join(tmpDir, "repo-local");
+        const subdir = path.join(repoPath, "apps", "app");
+        fs.mkdirSync(subdir, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+        await config.createConfigure(
+            repoPath,
+            { path: repoPath, workspace_slug: "ws-git", project_slug: "git", environment_id: "env-git" },
+            { scope: "git" },
+        );
+        writeLocalFile(subdir, { workspace: "ws-file", project: "app", environment: "env-file" });
+
+        const found = await config.findProjectConfig(subdir);
+        expect(found.project_slug).toBe("app");
+    });
+
+    it("throws a clear error for a malformed .enkryptify.json", async () => {
+        const dir = path.join(tmpDir, "broken");
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, ".enkryptify.json"), "{not json", "utf-8");
+
+        await expect(config.findProjectConfig(dir)).rejects.toThrow("invalid JSON");
+    });
+
+    it("throws when .enkryptify.json is missing required fields", async () => {
+        const dir = path.join(tmpDir, "incomplete");
+        writeLocalFile(dir, { workspace: "ws" });
+
+        await expect(config.findProjectConfig(dir)).rejects.toThrow("missing required fields");
+    });
+
+    it("does not read a .enkryptify.json located above the repository root", async () => {
+        const ancestor = path.join(tmpDir, "ancestor-local");
+        const repoPath = path.join(ancestor, "repo");
+        const subdir = path.join(repoPath, "src");
+        fs.mkdirSync(subdir, { recursive: true });
+        execFileSync("git", ["init"], { cwd: repoPath });
+        // A project file above the repo root must be ignored.
+        writeLocalFile(ancestor, { workspace: "ws", project: "x", environment: "env" });
+
+        await expect(config.findProjectConfig(subdir)).rejects.toThrow("No project configured");
+    });
 });

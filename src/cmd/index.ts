@@ -1,6 +1,7 @@
 import { registerConfigureCommand } from "@/cmd/configure";
 import { registerCreateCommand } from "@/cmd/create";
 import { registerDeleteCommand } from "@/cmd/delete";
+import { registerImportCommand } from "@/cmd/import";
 import { registerListCommand } from "@/cmd/listCommand";
 import { registerLoginCommand } from "@/cmd/login";
 import { registerLogoutCommand } from "@/cmd/logout";
@@ -18,6 +19,7 @@ export function registerCommands(program: Command) {
     registerLogoutCommand(program);
     registerWhoamiCommand(program);
     registerConfigureCommand(program);
+    registerImportCommand(program);
     registerScanCommand(program);
     registerRunCommand(program);
     registerRunFileCommand(program);
