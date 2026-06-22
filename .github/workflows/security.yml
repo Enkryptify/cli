@@ -10,7 +10,7 @@ jobs:
         name: Dependency Audit
         runs-on: blacksmith-2vcpu-ubuntu-2404
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
@@ -43,7 +43,7 @@ jobs:
         name: Full Secret Scan
         runs-on: blacksmith-2vcpu-ubuntu-2404
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
 
@@ -68,7 +68,7 @@ jobs:
         name: License Compliance
         runs-on: blacksmith-2vcpu-ubuntu-2404
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3
               with:
