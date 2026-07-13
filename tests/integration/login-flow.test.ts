@@ -173,6 +173,17 @@ describe("Auth.login() device flow", () => {
         expect(stored.auth.accessToken).toBe(TOKEN_RESPONSE.accessToken);
     });
 
+    it("preserves the stored token when validation fails transiently", async () => {
+        await mockKeyring.set("enkryptify", JSON.stringify(FAKE_AUTH_DATA));
+        vi.mocked(http.get).mockRejectedValueOnce(new Error("network unavailable"));
+
+        await expect(new Auth().login()).rejects.toThrow("network unavailable");
+
+        const stored = JSON.parse((await mockKeyring.get("enkryptify"))!);
+        expect(stored.auth.accessToken).toBe(FAKE_TOKEN);
+        expect(http.post).not.toHaveBeenCalled();
+    });
+
     it("reports a device-code creation failure", async () => {
         vi.mocked(http.post).mockResolvedValueOnce({ status: 503, data: {} });
 

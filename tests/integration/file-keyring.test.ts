@@ -44,9 +44,22 @@ describe("file credential store", () => {
 
     it("treats a corrupted fallback file as empty", async () => {
         await fs.mkdir(path.dirname(storePath), { recursive: true });
-        await fs.writeFile(storePath, JSON.stringify({ enkryptify: 123 }));
+        await fs.writeFile(storePath, "not-json");
         const { keyring } = await import("@/lib/keyring");
 
         await expect(keyring.get("enkryptify")).resolves.toBeNull();
+    });
+
+    it("does not overwrite the fallback file when reading it fails", async () => {
+        const original = JSON.stringify({ enkryptify: "secret-value" });
+        await fs.mkdir(path.dirname(storePath), { recursive: true });
+        await fs.writeFile(storePath, original, { mode: 0o600 });
+        await fs.chmod(storePath, 0o000);
+        const { keyring } = await import("@/lib/keyring");
+
+        await expect(keyring.set("enkryptify", "replacement-value")).rejects.toMatchObject({ code: "EACCES" });
+
+        await fs.chmod(storePath, 0o600);
+        await expect(fs.readFile(storePath, "utf8")).resolves.toBe(original);
     });
 });

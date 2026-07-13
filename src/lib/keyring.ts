@@ -41,8 +41,18 @@ class OSKeyring implements Keyring {
 
 class FileKeyring implements Keyring {
     private async read(): Promise<Record<string, string>> {
+        let raw: string;
         try {
-            const raw = await fs.readFile(STORE_PATH, "utf8");
+            raw = await fs.readFile(STORE_PATH, "utf8");
+        } catch (error: unknown) {
+            if (error instanceof Error && "code" in error && error.code === "ENOENT") return {};
+            logger.debug(
+                `File credential store read failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            throw error;
+        }
+
+        try {
             const parsed: unknown = JSON.parse(raw);
             if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
 
@@ -50,9 +60,8 @@ class FileKeyring implements Keyring {
                 Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
             );
         } catch (error: unknown) {
-            if (error instanceof Error && "code" in error && error.code === "ENOENT") return {};
             logger.debug(
-                `File credential store read failed: ${error instanceof Error ? error.message : String(error)}`,
+                `File credential store is corrupted: ${error instanceof Error ? error.message : String(error)}`,
             );
             return {};
         }

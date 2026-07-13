@@ -53,11 +53,15 @@ export class Auth {
         if (accessToken) {
             if (options?.force) {
                 await secureStore.clearAll();
-            } else if (await this.getUserInfo(accessToken).catch(() => null)) {
-                logger.info('Already logged in. Use "ek login --force" to re-authenticate with a different account.');
-                await configManager.markAuthenticated();
-                return;
             } else {
+                const userInfo = await this.getUserInfo(accessToken);
+                if (userInfo) {
+                    logger.info(
+                        'Already logged in. Use "ek login --force" to re-authenticate with a different account.',
+                    );
+                    await configManager.markAuthenticated();
+                    return;
+                }
                 await secureStore.clearAll();
             }
         }
