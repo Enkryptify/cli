@@ -11,19 +11,19 @@ import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
 
-const BETTERLEAKS_VERSION = "1.3.0";
+const BETTERLEAKS_VERSION = "1.6.1";
 const BETTERLEAKS_DOWNLOAD_BASE = "https://github.com/betterleaks/betterleaks/releases/download";
 
-// SHA-256 of each pinned release asset, copied from betterleaks' official v1.3.0
+// SHA-256 of each pinned release asset, copied from betterleaks' official v1.6.1
 // checksums.txt. Pinned in source rather than fetched at runtime so a tampered or
 // MITM'd download can't also supply a matching checksum. Update with the version.
 const BETTERLEAKS_CHECKSUMS: Record<string, string> = {
-    "betterleaks_1.3.0_darwin_arm64.tar.gz": "e2110fc396d96f8795a668f294efd8a84ec96d694d1daf9ce1a4fa788d354f4c",
-    "betterleaks_1.3.0_darwin_x64.tar.gz": "270e8b46b9b5478199b3facc5ee01bd67659de9c8e57b7b1d6c1336f44ee7822",
-    "betterleaks_1.3.0_linux_arm64.tar.gz": "53e94d704871e11d47e25304cb0813ce6aa0cf96b58d7b92ed7bc5a1d568efde",
-    "betterleaks_1.3.0_linux_x64.tar.gz": "51568ae18383996aa24d87807879774e1feb75bd5a5a652d19ce0fd14e4c06ba",
-    "betterleaks_1.3.0_windows_arm64.zip": "079571796442c527106143024f03a6b21af9e542a59bc1f33b1d9cd042f7a141",
-    "betterleaks_1.3.0_windows_x64.zip": "6c3c2950befd972e080ebc2f1a7278187efc75f60ea75a737b95e3c8703efdd7",
+    "betterleaks_1.6.1_darwin_arm64.tar.gz": "9996bfcc93fd2ae6976c7902e3b2177766ec1960c1e30a15398609d5177ef3f8",
+    "betterleaks_1.6.1_darwin_x64.tar.gz": "07ddb85c4b2c55da6b671a6af667c89d89c68c52aff8fd73a1118a92d373db8c",
+    "betterleaks_1.6.1_linux_arm64.tar.gz": "bab9688ba968264ace67b608fc7a7d8f5e61218cde70029d32cbc894e3808fdf",
+    "betterleaks_1.6.1_linux_x64.tar.gz": "fbefc700a0bd4522cc952dd2a8f259cdb80526d7e60114aca19bb2d6fdc80f81",
+    "betterleaks_1.6.1_windows_arm64.zip": "fc9bc3d554161e4c94f3510f59d6a790c2ce52f25a5b99520efe1e529efa0912",
+    "betterleaks_1.6.1_windows_x64.zip": "3ada08a8b19afab75b111e10f38682a64c0582824c9903ce868b09b0c3c2cf37",
 };
 
 const INSTALL_DIR = path.join(os.homedir(), ".enkryptify", "bin");
