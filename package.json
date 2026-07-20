@@ -47,7 +47,7 @@
         "@types/semver": "^7.7.1",
         "@vitest/coverage-v8": "^4.1.10",
         "msw": "^2.15.0",
-        "oxfmt": "^0.47.0",
+        "oxfmt": "^0.59.0",
         "oxlint": "^1.73.0",
         "typescript": "^6.0.3",
         "vitest": "^4.1.10"
